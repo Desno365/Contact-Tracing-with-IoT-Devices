@@ -1,11 +1,11 @@
-package it.polimi.middleware.project1;
+package it.polimi.middleware.project1.server;
 
 import org.eclipse.paho.client.mqttv3.MqttException;
 
 public class MqttUtils {
 
-	public static final String BROKER = "tcp://mqtt.neslab.it:3200";
-	public static final int QOS = 1;
+	public static final String DEFAULT_BROKER = "tcp://mqtt.neslab.it:3200";
+	public static final int DEFAULT_QOS = 1;
 	public static final String CONTACT_TOPIC = "AccordiBurattiMotta-Contact-Tracing/contact/json";
 
 	private MqttUtils() {

@@ -1,4 +1,4 @@
-package it.polimi.middleware.project1;
+package it.polimi.middleware.project1.server;
 
 import java.util.HashMap;
 import java.util.Map;
