@@ -20,9 +20,9 @@ public class ProximitySensorsSimulation {
 		}
 
 		final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(3);
-		scheduler.scheduleAtFixedRate(ProximitySensorsSimulation::createSimulatedContact, 5000, 5000, TimeUnit.MILLISECONDS);
-		scheduler.scheduleAtFixedRate(ProximitySensorsSimulation::createSimulatedContact, 4999, 5000, TimeUnit.MILLISECONDS);
-		scheduler.scheduleAtFixedRate(ProximitySensorsSimulation::createSimulatedContact, 4998, 5000, TimeUnit.MILLISECONDS);
+		scheduler.scheduleAtFixedRate(ProximitySensorsSimulation::createSimulatedContact, 5, 10, TimeUnit.SECONDS);
+		scheduler.scheduleAtFixedRate(ProximitySensorsSimulation::createSimulatedContact, 5, 10, TimeUnit.SECONDS);
+		scheduler.scheduleAtFixedRate(ProximitySensorsSimulation::createSimulatedContact, 5, 10, TimeUnit.SECONDS);
 	}
 
 	public static int getRandomValidDeviceId() {

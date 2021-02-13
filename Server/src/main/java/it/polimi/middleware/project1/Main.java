@@ -11,7 +11,7 @@ import java.util.*;
 
 public class Main {
 
-	private static HashMap<Integer, HashSet<Integer>> contacts = new HashMap<>();
+	private static final HashMap<Integer, ContactsOfSingleDevice> contacts = new HashMap<>();
 
 	public static void main(String[] args) {
 		try {
@@ -47,38 +47,37 @@ public class Main {
 			System.out.println("Information received: myId " + myId + ", otherId: " + otherId + ".");
 			processContactInformation(myId, otherId);
 		} catch(Exception err) {
-			System.out.println("Error: " + err.toString());
+			System.out.println("Failed to process json, error: " + err.toString());
 		}
 	}
 
-	private static synchronized void processContactInformation(int deviceId1, int deviceId2) {
-		// Get sets of contacts for each device.
-		HashSet<Integer> set1 = contacts.get(deviceId1);
-		HashSet<Integer> set2 = contacts.get(deviceId2);
-
-		// If sets of contacts are null, create them.
-		if(set1 == null) {
-			set1 = new HashSet<>();
-			contacts.put(deviceId1, set1);
-		}
-		if(set2 == null) {
-			set2 = new HashSet<>();
-			contacts.put(deviceId2, set2);
+	private static void processContactInformation(int deviceId1, int deviceId2) {
+		if(deviceId1 == deviceId2) {
+			System.out.println("Device in contact with itself, ignored.");
+			return;
 		}
 
-		// Add single contact to the sets of the two devices.
-		set1.add(deviceId2);
-		set2.add(deviceId1);
+		// Two directional contacts since the contact is bidirectional.
+		final long timestamp = System.currentTimeMillis();
+		addDirectionalContact(deviceId1, deviceId2, timestamp);
+		addDirectionalContact(deviceId2, deviceId1, timestamp);
 
 		debugPrintWholeContacts();
 	}
 
+	private static void addDirectionalContact(int deviceId, int otherDeviceId, long timestamp) {
+		// Get container of contacts of "deviceId" (if it is absent it is created).
+		ContactsOfSingleDevice contactsOfDevice = contacts.computeIfAbsent(deviceId, ContactsOfSingleDevice::new);
+
+		// Add contact "deviceId"->"otherDeviceId" using the container of contacts of "deviceId".
+		contactsOfDevice.addOrUpdateContact(otherDeviceId, timestamp);
+	}
+
 	private static void debugPrintWholeContacts() {
 		System.out.println("######### DEBUG CURRENT CONTACTS #########");
-		for(Map.Entry<Integer, HashSet<Integer>> entry : contacts.entrySet()) {
-			Integer deviceId = entry.getKey();
-			HashSet<Integer> contactsForDevice = entry.getValue();
-			System.out.println("Contacts of device " + deviceId + ": " + contactsForDevice.toString());
+		for(Map.Entry<Integer, ContactsOfSingleDevice> entry : contacts.entrySet()) {
+			ContactsOfSingleDevice contactsOfSingleDevice = entry.getValue();
+			System.out.println(contactsOfSingleDevice.toString());
 		}
 		System.out.println("##########################################");
 	}
