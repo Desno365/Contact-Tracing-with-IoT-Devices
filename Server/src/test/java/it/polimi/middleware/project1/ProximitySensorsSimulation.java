@@ -4,11 +4,16 @@ import java.util.HashMap;
 import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 public class ProximitySensorsSimulation {
 
 	public static final int NUMBER_OF_SENSORS = 10;
+
+	private static final int INITIAL_DELAY_IN_SECONDS = 5;
+	private static final int PERIOD_IN_SECONDS = 5;
+	private static final int STOP_AFTER_SECONDS = 17;
 
 	private static final HashMap<Integer, ProximitySensor> proximitySensorHashMap = new HashMap<>();
 
@@ -20,9 +25,18 @@ public class ProximitySensorsSimulation {
 		}
 
 		final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(3);
-		scheduler.scheduleAtFixedRate(ProximitySensorsSimulation::createSimulatedContact, 5, 10, TimeUnit.SECONDS);
-		scheduler.scheduleAtFixedRate(ProximitySensorsSimulation::createSimulatedContact, 5, 10, TimeUnit.SECONDS);
-		scheduler.scheduleAtFixedRate(ProximitySensorsSimulation::createSimulatedContact, 5, 10, TimeUnit.SECONDS);
+		final ScheduledFuture<?> schedule1 = scheduler.scheduleAtFixedRate(ProximitySensorsSimulation::createSimulatedContact, INITIAL_DELAY_IN_SECONDS, PERIOD_IN_SECONDS, TimeUnit.SECONDS);
+		final ScheduledFuture<?> schedule2 = scheduler.scheduleAtFixedRate(ProximitySensorsSimulation::createSimulatedContact, INITIAL_DELAY_IN_SECONDS, PERIOD_IN_SECONDS, TimeUnit.SECONDS);
+		final ScheduledFuture<?> schedule3 = scheduler.scheduleAtFixedRate(ProximitySensorsSimulation::createSimulatedContact, INITIAL_DELAY_IN_SECONDS, PERIOD_IN_SECONDS, TimeUnit.SECONDS);
+
+		new java.util.Timer().schedule(new java.util.TimerTask() {
+			@Override
+			public void run() {
+				schedule1.cancel(false);
+				schedule2.cancel(false);
+				schedule3.cancel(false);
+			}
+		}, STOP_AFTER_SECONDS * 1000);
 	}
 
 	public static int getRandomValidDeviceId() {

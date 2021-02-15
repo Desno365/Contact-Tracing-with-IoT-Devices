@@ -18,6 +18,10 @@ public class ContactsOfSingleDevice {
 		timestampOfContacts.put(otherDeviceId, currentTimestampMs);
 	}
 
+	public Map<Integer, Long> getCopyOfTimestampOfContacts() {
+		return new HashMap<>(timestampOfContacts);
+	}
+
 	@Override
 	public String toString() {
 		return "Contacts of device " + deviceId + ": " + timestampOfContacts.toString() + ".";

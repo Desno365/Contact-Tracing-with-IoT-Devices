@@ -6,7 +6,7 @@ public class MqttUtils {
 
 	public static final String DEFAULT_BROKER = "tcp://mqtt.neslab.it:3200";
 	public static final int DEFAULT_QOS = 1;
-	public static final String CONTACT_TOPIC = "AccordiBurattiMotta-Contact-Tracing/contact/json";
+	public static final String CONTACT_TOPIC = "AccordiBurattiMotta-Topic/contact/json";
 
 	private MqttUtils() {
 		throw new IllegalStateException("Utils class with static methods. Should not be instantiated.");
@@ -19,5 +19,9 @@ public class MqttUtils {
 		System.out.println("cause: " + me.getCause());
 		System.out.println("excep: " + me);
 		me.printStackTrace();
+	}
+
+	public static String getNotificationTopicForDevice(int deviceId) {
+		return "AccordiBurattiMotta-Topic/notif/sensor" + deviceId + "/json";
 	}
 }

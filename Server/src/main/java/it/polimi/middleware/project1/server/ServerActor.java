@@ -2,34 +2,28 @@ package it.polimi.middleware.project1.server;
 
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
-import akka.actor.typed.receptionist.Receptionist;
-import akka.actor.typed.receptionist.ServiceKey;
 import it.polimi.middleware.project1.messages.ContactMessage;
 import it.polimi.middleware.project1.messages.EventOfInterestAckMessage;
 import it.polimi.middleware.project1.messages.EventOfInterestReportMessage;
-import org.eclipse.paho.client.mqttv3.MqttClient;
-import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
-import org.eclipse.paho.client.mqttv3.MqttException;
-import org.eclipse.paho.client.mqttv3.MqttMessage;
+import org.eclipse.paho.client.mqttv3.*;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 import org.json.JSONObject;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
 public class ServerActor extends AbstractActor {
 
-	private final ServiceKey<ServerActor> serverActorKey;
 	private final String mqttBroker;
 	private final String mqttTopic;
-	private final HashMap<Integer, ContactsOfSingleDevice> contacts = new HashMap<>();
+	private final Contacts contacts = new Contacts();
+
+	private IMqttClient mqttProducer;
 
 	public ServerActor(String mqttBroker, String mqttTopic) {
-		this.serverActorKey = ServiceKey.create(ServerActor.class, "ServerActorId");
 		this.mqttBroker = mqttBroker;
 		this.mqttTopic = mqttTopic;
-		subscribeToMqttMessages();
+		connectToMqttBroker();
 	}
 
 	@Override
@@ -40,28 +34,33 @@ public class ServerActor extends AbstractActor {
 				.build();
 	}
 
+
 	// ##############################################################
 	//region Private methods
 	// ###############################
 
-	private void subscribeToMqttMessages() {
+	private void connectToMqttBroker() {
 		// Simulate the IOT devices as actors by sending instances of ContactMessage to itself.
 		try {
-			MemoryPersistence persistence = new MemoryPersistence();
-			String subscriberId = UUID.randomUUID().toString();
-			MqttClient subscriber = new MqttClient(mqttBroker, subscriberId, persistence);
+			final MemoryPersistence subscriberPersistence = new MemoryPersistence();
+			final String subscriberId = UUID.randomUUID().toString();
+			final MqttClient mqttSubscriber = new MqttClient(mqttBroker, subscriberId, subscriberPersistence);
+			final MemoryPersistence producerPersistence = new MemoryPersistence();
+			final String producerId = UUID.randomUUID().toString();
+			mqttProducer = new MqttClient(mqttBroker, producerId, producerPersistence);
 
-			MqttConnectOptions options = new MqttConnectOptions();
+			final MqttConnectOptions options = new MqttConnectOptions();
 			options.setAutomaticReconnect(true);
 			options.setCleanSession(true);
 			options.setConnectionTimeout(10);
 
 			System.out.println("Connecting to broker: " + mqttBroker);
-			subscriber.connect(options);
+			mqttSubscriber.connect(options);
+			mqttProducer.connect(options);
 			System.out.println("Connected");
 
-			System.out.println("Subscribing to messages.");
-			subscriber.subscribe(mqttTopic, MqttUtils.DEFAULT_QOS, (String topic, MqttMessage mqttMessage) -> {
+			System.out.println("Subscribing to messages of topic \"" + mqttTopic + "\".");
+			mqttSubscriber.subscribe(mqttTopic, MqttUtils.DEFAULT_QOS, (String topic, MqttMessage mqttMessage) -> {
 				final String stringPayload = new String(mqttMessage.getPayload());
 				System.out.println("MQTT message received: topic \"" + topic + "\"; payload: \"" + stringPayload + "\".");
 
@@ -89,34 +88,40 @@ public class ServerActor extends AbstractActor {
 			return;
 		}
 
-		// Two directional contacts since the contact is bidirectional.
-		final long timestamp = System.currentTimeMillis();
-		addDirectionalContact(msg.getMyId(), msg.getOtherId(), timestamp);
-		addDirectionalContact(msg.getOtherId(), msg.getMyId(), timestamp);
+		contacts.addContact(msg.getMyId(), msg.getOtherId());
 
-		debugPrintWholeContacts();
+		// To debug we print the contacts each time. (TODO remove)
+		contacts.printContacts();
 	}
 
 	private void onEventOfInterestReportMessage(EventOfInterestReportMessage msg) {
 		System.out.println("Event of interest report received: affectedId " + msg.getAffectedId() + ".");
+
+		final Map<Integer, Long> timestampOfContactsOfSingleDevice = contacts.getTimestampOfContactsOfSingleDevice(msg.getAffectedId());
+		System.out.println("Devices entered in contact with " + msg.getAffectedId() + " are " + timestampOfContactsOfSingleDevice.keySet().toString() + ".");
+
+		for(Map.Entry<Integer, Long> entry : timestampOfContactsOfSingleDevice.entrySet())
+			sendNotificationToDevice(entry.getKey(), entry.getValue());
+
 		sender().tell(new EventOfInterestAckMessage(msg.getAffectedId()), self());
 	}
 
-	private void addDirectionalContact(int deviceId, int otherDeviceId, long timestamp) {
-		// Get container of contacts of "deviceId" (if it is absent it is created).
-		ContactsOfSingleDevice contactsOfDevice = contacts.computeIfAbsent(deviceId, ContactsOfSingleDevice::new);
-
-		// Add contact "deviceId"->"otherDeviceId" using the container of contacts of "deviceId".
-		contactsOfDevice.addOrUpdateContact(otherDeviceId, timestamp);
+	private void sendNotificationToDevice(int deviceId, long timestampOfContact) {
+		final String messageContent = getNotificationMessageContent(deviceId, timestampOfContact);
+		final String topic = MqttUtils.getNotificationTopicForDevice(deviceId);
+		try {
+			System.out.println("Publishing message: \"" + messageContent + "\" to topic \"" + topic + "\".");
+			final MqttMessage message = new MqttMessage(messageContent.getBytes());
+			message.setQos(MqttUtils.DEFAULT_QOS);
+			mqttProducer.publish(topic, message);
+			System.out.println("Message published.");
+		} catch(MqttException me) {
+			MqttUtils.logMqttException(me);
+		}
 	}
 
-	private void debugPrintWholeContacts() {
-		System.out.println("######### DEBUG CURRENT CONTACTS #########");
-		for(Map.Entry<Integer, ContactsOfSingleDevice> entry : contacts.entrySet()) {
-			ContactsOfSingleDevice contactsOfSingleDevice = entry.getValue();
-			System.out.println(contactsOfSingleDevice.toString());
-		}
-		System.out.println("##########################################");
+	private String getNotificationMessageContent(int deviceId, long timestampOfContact) {
+		return "{\"notification\":{\"deviceId\":\"" + deviceId + "\",\"timestampOfContact\":\"" + timestampOfContact + "\"}}";
 	}
 	//endregion
 }
