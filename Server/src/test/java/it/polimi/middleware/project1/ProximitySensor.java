@@ -1,7 +1,5 @@
 package it.polimi.middleware.project1;
 
-import akka.actor.ActorRef;
-import it.polimi.middleware.project1.messages.ContactMessage;
 import it.polimi.middleware.project1.server.MqttUtils;
 import org.eclipse.paho.client.mqttv3.*;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
@@ -76,7 +74,7 @@ public class ProximitySensor {
 			System.out.println(deviceId + ": publishing message: " + payload + ".");
 			MqttMessage mqttMessage = new MqttMessage(payload.getBytes());
 			mqttMessage.setQos(MqttUtils.DEFAULT_QOS);
-			mqttProducer.publish(MqttUtils.CONTACT_TOPIC, mqttMessage);
+			mqttProducer.publish(MqttUtils.getContactTopicForRegion("region1"), mqttMessage);
 			System.out.println(deviceId + ": message published.");
 		} catch(MqttException me) {
 			MqttUtils.logMqttException(me);
