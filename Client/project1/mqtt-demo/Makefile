@@ -1,6 +1,5 @@
 all: mqtt-demo
 
-
 MODULES += os/net/app-layer/mqtt
 
 CONTIKI = ../..

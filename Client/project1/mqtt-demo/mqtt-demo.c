@@ -88,7 +88,6 @@ static uint8_t connect_attempt;
 /*---------------------------------------------------------------------------*/
 /* Various states */
 static uint8_t state;
-#define STATE_INIT            0
 #define STATE_REGISTERED      1
 #define STATE_CONNECTING      2
 #define STATE_CONNECTED       3
@@ -327,8 +326,21 @@ update_config(void)
 
   /* Reset the counter */
   seq_nr_value = 0;
+  
+  /* If we have just been configured register MQTT connection */
+    mqtt_register(&conn, &mqtt_demo_process, client_id, mqtt_event,
+                  MAX_TCP_SEGMENT_SIZE);
 
-  state = STATE_INIT;
+    mqtt_set_username_password(&conn, "use-token-auth",
+                                   conf.auth_token);
+
+    /* _register() will set auto_reconnect; we don't want that */
+    conn.auto_reconnect = 0;
+    connect_attempt = 1;
+
+    state = STATE_REGISTERED;
+    LOG_INFO("Init\n");
+    /* Continue */
 
   /*
    * Schedule next timer event ASAP
@@ -338,6 +350,7 @@ update_config(void)
    * Since the error at this stage is a config error, we will only exit this
    * error state if we get a new config
    */
+   //TODO first Timer starts here
   etimer_set(&publish_periodic_timer, 0);
 
   return;
@@ -372,12 +385,6 @@ subscribe(void)
   }
 }
 /*---------------------------------------------------------------------------*/
-static int
-get_onboard_temp(void)
-{
-  return NATIVE_TEMPERATURE;
-}
-/*---------------------------------------------------------------------------*/
 static void
 publish(void)
 {
@@ -390,13 +397,7 @@ publish(void)
   buf_ptr = app_buffer;
 
   len = snprintf(buf_ptr, remaining,
-                 "{"
-                 "\"d\":{"
-                 "\"myName\":\"%s\","
-                 "\"Seq #\":%d,"
-                 "\"Uptime (sec)\":%lu,"
-                 "\"Temp (C)\":%d",
-                 "native", seq_nr_value,clock_seconds(),get_onboard_temp()); 
+                 "test");  //TODO fix
 
   if(len < 0 || len >= remaining) {
     LOG_ERR("Buffer too short. Have %d, need %d + \\0\n", remaining, len);
@@ -448,21 +449,7 @@ static void
 state_machine(void)
 {
   switch(state) {
-  case STATE_INIT:
-    /* If we have just been configured register MQTT connection */
-    mqtt_register(&conn, &mqtt_demo_process, client_id, mqtt_event,
-                  MAX_TCP_SEGMENT_SIZE);
-
-    mqtt_set_username_password(&conn, "use-token-auth",
-                                   conf.auth_token);
-
-    /* _register() will set auto_reconnect; we don't want that */
-    conn.auto_reconnect = 0;
-    connect_attempt = 1;
-
-    state = STATE_REGISTERED;
-    LOG_INFO("Init\n");
-    /* Continue */
+    
   case STATE_REGISTERED:
     if(uip_ds6_get_global(ADDR_PREFERRED) != NULL) {
       /* Registered and with a global IPv6 address, connect! */
@@ -481,46 +468,7 @@ state_machine(void)
     /* Not connected yet. Wait */
     LOG_INFO("Connecting: retry %u...\n", connect_attempt);
     break;
-  case STATE_CONNECTED:
-  case STATE_PUBLISHING:
-    /* If the timer expired, the connection is stable */
-    if(timer_expired(&connection_life)) {
-      /*
-       * Intentionally using 0 here instead of 1: We want RECONNECT_ATTEMPTS
-       * attempts if we disconnect after a successful connect
-       */
-      connect_attempt = 0;
-    }
-
-    if(mqtt_ready(&conn) && conn.out_buffer_sent) {
-      /* Connected; publish */
-      if(state == STATE_CONNECTED) {
-        subscribe();
-        state = STATE_PUBLISHING;
-      } else {
-        leds_on(MQTT_DEMO_STATUS_LED);
-        ctimer_set(&ct, PUBLISH_LED_ON_DURATION, publish_led_off, NULL);
-        publish();
-      }
-      etimer_set(&publish_periodic_timer, conf.pub_interval);
-
-      LOG_INFO("Publishing\n");
-      /* Return here so we don't end up rescheduling the timer */
-      return;
-    } else {
-      /*
-       * Our publish timer fired, but some MQTT packet is already in flight
-       * (either not sent at all, or sent but not fully ACKd)
-       *
-       * This can mean that we have lost connectivity to our broker or that
-       * simply there is some network delay. In both cases, we refuse to
-       * trigger a new message and we wait for TCP to either ACK the entire
-       * packet after retries, or to timeout and notify us
-       */
-      LOG_INFO("Publishing... (MQTT state=%d, q=%u)\n", conn.state,
-          conn.out_queue_full);
-    }
-    break;
+  
   case STATE_DISCONNECTED:
     LOG_INFO("Disconnected\n");
     if(connect_attempt < RECONNECT_ATTEMPTS ||
@@ -549,6 +497,13 @@ state_machine(void)
     /* Idle away. The only way out is a new config */
     LOG_ERR("Bad configuration.\n");
     return;
+    
+  case STATE_CONNECTED:
+  case STATE_PUBLISHING:
+  	LOG_INFO("works\n");
+  	etimer_set(&publish_periodic_timer, conf.pub_interval);
+  	return;
+  	break;
   case STATE_ERROR:
   default:
     leds_on(MQTT_DEMO_STATUS_LED);
@@ -566,6 +521,50 @@ state_machine(void)
   etimer_set(&publish_periodic_timer, STATE_MACHINE_PERIODIC);
 }
 /*---------------------------------------------------------------------------*/
+static void publish_state(void){
+	switch (state){
+		case STATE_CONNECTED:
+  		case STATE_PUBLISHING:
+		/* If the timer expired, the connection is stable */
+		if(timer_expired(&connection_life)) {
+		  /*
+		   * Intentionally using 0 here instead of 1: We want RECONNECT_ATTEMPTS
+		   * attempts if we disconnect after a successful connect
+		   */
+		  connect_attempt = 0;
+		}
+
+		if(mqtt_ready(&conn) && conn.out_buffer_sent) {
+		  /* Connected; publish */
+		  if(state == STATE_CONNECTED) {
+		    subscribe();
+		    state = STATE_PUBLISHING;
+		  } else {
+		    leds_on(MQTT_DEMO_STATUS_LED);
+		    ctimer_set(&ct, PUBLISH_LED_ON_DURATION, publish_led_off, NULL);
+		    publish();
+		  }
+
+		  LOG_INFO("Publishing\n");
+		  /* Return here so we don't end up rescheduling the timer */
+		  return;
+		} else {
+		  /*
+		   * Our publish timer fired, but some MQTT packet is already in flight
+		   * (either not sent at all, or sent but not fully ACKd)
+		   *
+		   * This can mean that we have lost connectivity to our broker or that
+		   * simply there is some network delay. In both cases, we refuse to
+		   * trigger a new message and we wait for TCP to either ACK the entire
+		   * packet after retries, or to timeout and notify us
+		   */
+		  LOG_INFO("Publishing... (MQTT state=%d, q=%u)\n", conn.state,
+		      conn.out_queue_full);
+		}
+		break;
+	}
+}
+
 PROCESS_THREAD(mqtt_demo_process, ev, data)
 {
 
@@ -584,9 +583,14 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
     if (ev == PROCESS_EVENT_TIMER && data == &publish_periodic_timer) {
       state_machine();
     }
+    
+    if(0){
+    	publish_state();
+    }
+    
 
   }
-
+	
   PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
