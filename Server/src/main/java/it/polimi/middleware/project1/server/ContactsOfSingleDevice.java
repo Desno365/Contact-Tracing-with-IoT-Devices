@@ -1,9 +1,10 @@
 package it.polimi.middleware.project1.server;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
-public class ContactsOfSingleDevice {
+public class ContactsOfSingleDevice implements Serializable {
 
 	private final int deviceId;
 	private final Map<Integer, Long> timestampOfContacts = new HashMap<>();
