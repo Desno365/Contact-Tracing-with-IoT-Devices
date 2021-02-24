@@ -20,7 +20,8 @@ public class ProximitySensorsSimulation {
 	public static void main(String[] args) {
 		// Create proximity sensors.
 		for(int deviceId = 1; deviceId <= NUMBER_OF_SENSORS; deviceId++) {
-			final ProximitySensor proximitySensor = new ProximitySensor(deviceId);
+			final String region = getExampleRegionForDeviceId(deviceId);
+			final ProximitySensor proximitySensor = new ProximitySensor(deviceId, region);
 			proximitySensorHashMap.put(deviceId, proximitySensor);
 		}
 
@@ -39,8 +40,9 @@ public class ProximitySensorsSimulation {
 		}, STOP_AFTER_SECONDS * 1000);
 	}
 
-	public static int getRandomValidDeviceId() {
-		return new Random().nextInt(ProximitySensorsSimulation.NUMBER_OF_SENSORS) + 1;
+	private static String getExampleRegionForDeviceId(int deviceId) {
+		int regionNumber = (deviceId % 3) + 1;
+		return "region" + regionNumber;
 	}
 
 	private static void createSimulatedContact() {
@@ -55,6 +57,10 @@ public class ProximitySensorsSimulation {
 		// Send contact message.
 		proximitySensorHashMap.get(deviceId).sendSimulatedContactMessage(otherDeviceId);
 		proximitySensorHashMap.get(otherDeviceId).sendSimulatedContactMessage(deviceId);
+	}
+
+	public static int getRandomValidDeviceId() {
+		return new Random().nextInt(ProximitySensorsSimulation.NUMBER_OF_SENSORS) + 1;
 	}
 
 }

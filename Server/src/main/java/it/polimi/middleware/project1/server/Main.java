@@ -10,6 +10,7 @@ import it.polimi.middleware.project1.utils.MqttUtils;
 public class Main {
 
 	public static void main(String[] args) {
+		// TODO get region and port from args.
 		final Config conf = ConfigFactory.parseResources(AkkaUtils.SERVER_CONFIG);
 		final ActorSystem sys = ActorSystem.create(AkkaUtils.ACTOR_SYSTEM_NAME, conf);
 		sys.actorOf(Props.create(ServerActor.class, MqttUtils.DEFAULT_BROKER, "region1"), "ServerActor-region1");
