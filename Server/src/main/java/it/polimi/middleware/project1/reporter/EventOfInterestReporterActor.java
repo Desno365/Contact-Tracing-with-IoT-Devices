@@ -2,16 +2,19 @@ package it.polimi.middleware.project1.reporter;
 
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
-import akka.actor.ActorSelection;
-import akka.dispatch.OnComplete;
-import akka.util.Timeout;
+import akka.cluster.pubsub.DistributedPubSub;
+import akka.cluster.pubsub.DistributedPubSubMediator;
 import it.polimi.middleware.project1.messages.EventOfInterestAckMessage;
 import it.polimi.middleware.project1.messages.EventOfInterestReportMessage;
-import scala.concurrent.ExecutionContext;
-
-import java.util.concurrent.TimeUnit;
+import it.polimi.middleware.project1.utils.AkkaUtils;
 
 public class EventOfInterestReporterActor extends AbstractActor {
+
+	private final ActorRef mediatorActorRef;
+
+	public EventOfInterestReporterActor() {
+		this.mediatorActorRef = DistributedPubSub.get(getContext().getSystem()).mediator();
+	}
 
 	@Override
 	public Receive createReceive() {
@@ -22,22 +25,14 @@ public class EventOfInterestReporterActor extends AbstractActor {
 	}
 
 	private void onEventOfInterestReportMessage(EventOfInterestReportMessage msg) {
-		System.out.println("Sending event of interest. Affected device id: " + msg.getAffectedId() + ".");
+		System.out.println("Sending event of interest. Affected device id: " + msg.affectedId + ".");
 
-		ActorSelection selection = getContext().getSystem().actorSelection("akka://contact-tracing-system@127.0.0.1:6123/user/ServerActor");
-		final ExecutionContext ec = getContext().getSystem().dispatcher();
-		selection.resolveOne(new Timeout(10, TimeUnit.SECONDS)).andThen(new OnComplete<ActorRef>() {
-			public void onComplete(Throwable failure, ActorRef actorRef) {
-				if(actorRef != null)
-					actorRef.tell(msg, self());
-				else
-					System.out.println("ServerActor not found!");
-			}
-		}, ec);
+		final String topic = AkkaUtils.getEventOfInterestTopicForRegion(msg.region);
+		mediatorActorRef.tell(new DistributedPubSubMediator.Publish(topic, msg), getSelf());
 	}
 
 	private void onEventOfInterestAckMessage(EventOfInterestAckMessage msg) {
-		System.out.println("Received ack of event of interest. Affected device id: " + msg.getAffectedId() + ".");
+		System.out.println("Received ack of event of interest. Affected device id: " + msg.affectedId + ".");
 	}
 
 }

@@ -1,4 +1,4 @@
-package it.polimi.middleware.project1.server;
+package it.polimi.middleware.project1.utils;
 
 import org.eclipse.paho.client.mqttv3.MqttException;
 

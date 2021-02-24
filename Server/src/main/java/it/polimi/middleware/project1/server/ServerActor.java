@@ -2,9 +2,13 @@ package it.polimi.middleware.project1.server;
 
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
+import akka.cluster.pubsub.DistributedPubSub;
+import akka.cluster.pubsub.DistributedPubSubMediator;
 import it.polimi.middleware.project1.messages.ContactMessage;
 import it.polimi.middleware.project1.messages.EventOfInterestAckMessage;
 import it.polimi.middleware.project1.messages.EventOfInterestReportMessage;
+import it.polimi.middleware.project1.utils.AkkaUtils;
+import it.polimi.middleware.project1.utils.MqttUtils;
 import org.eclipse.paho.client.mqttv3.*;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 import org.json.JSONObject;
@@ -15,20 +19,27 @@ import java.util.UUID;
 public class ServerActor extends AbstractActor {
 
 	private final String mqttBroker;
-	private final String mqttTopic;
-	private final Contacts contacts = new Contacts();
+	private final String region;
+	private final ActorRef mediatorActorRef;
 
+	// State.
+	private Contacts contacts = new Contacts();
+
+	// MQTT.
 	private IMqttClient mqttProducer;
 
-	public ServerActor(String mqttBroker, String mqttTopic) {
+	public ServerActor(String mqttBroker, String region) {
 		this.mqttBroker = mqttBroker;
-		this.mqttTopic = mqttTopic;
+		this.region = region;
+		this.mediatorActorRef = DistributedPubSub.get(getContext().getSystem()).mediator();
 		connectToMqttBroker();
+		subscribeToEventOfInterestTopic();
 	}
 
 	@Override
 	public Receive createReceive() {
 		return receiveBuilder()
+				.match(DistributedPubSubMediator.SubscribeAck.class, this::onSubscribeAckMessage)
 				.match(ContactMessage.class, this::onContactMessage)
 				.match(EventOfInterestReportMessage.class, this::onEventOfInterestReportMessage)
 				.build();
@@ -54,15 +65,16 @@ public class ServerActor extends AbstractActor {
 			options.setCleanSession(true);
 			options.setConnectionTimeout(10);
 
-			System.out.println("Connecting to broker: " + mqttBroker);
+			log("MQTT: Connecting to broker: " + mqttBroker);
 			mqttSubscriber.connect(options);
 			mqttProducer.connect(options);
-			System.out.println("Connected");
+			log("MQTT: Connected.");
 
-			System.out.println("Subscribing to messages of topic \"" + mqttTopic + "\".");
-			mqttSubscriber.subscribe(mqttTopic, MqttUtils.DEFAULT_QOS, (String topic, MqttMessage mqttMessage) -> {
+			final String contactTopic = MqttUtils.getContactTopicForRegion(region);
+			log("MQTT: Subscribing to messages of topic \"" + contactTopic + "\".");
+			mqttSubscriber.subscribe(contactTopic, MqttUtils.DEFAULT_QOS, (String topic, MqttMessage mqttMessage) -> {
 				final String stringPayload = new String(mqttMessage.getPayload());
-				System.out.println("MQTT message received: topic \"" + topic + "\"; payload: \"" + stringPayload + "\".");
+				log("MQTT: message received: topic \"" + topic + "\"; payload: \"" + stringPayload + "\".");
 
 				try {
 					final JSONObject jsonObject = new JSONObject(stringPayload);
@@ -71,50 +83,60 @@ public class ServerActor extends AbstractActor {
 
 					self().tell(new ContactMessage(myId, otherId), ActorRef.noSender());
 				} catch(Exception err) {
-					System.out.println("Failed to process json, error: " + err.toString());
+					log("Failed to process json, error: " + err.toString());
 				}
 			});
-			System.out.println("Subscribed.");
+			log("MQTT: Subscribed.");
 		} catch(MqttException me) {
 			MqttUtils.logMqttException(me);
 		}
 	}
 
-	private void onContactMessage(ContactMessage msg) {
-		System.out.println("Contact message received: myId " + msg.getMyId() + ", otherId: " + msg.getOtherId() + ".");
+	private void subscribeToEventOfInterestTopic() {
+		final String topic = AkkaUtils.getEventOfInterestTopicForRegion(region);
+		log("Akka Pub/Sub: Subscribing to messages of topic \"" + topic + "\".");
+		mediatorActorRef.tell(new DistributedPubSubMediator.Subscribe(topic, getSelf()), getSelf());
+	}
 
-		if(msg.getMyId() == msg.getOtherId()) {
-			System.out.println("Device in contact with itself, ignored.");
+	void onSubscribeAckMessage(DistributedPubSubMediator.SubscribeAck msg) {
+		log("Akka Pub/Sub: Subscribed.");
+	}
+
+	private void onContactMessage(ContactMessage msg) {
+		log("Contact message received: myId " + msg.myId + ", otherId: " + msg.otherId + ".");
+
+		if(msg.myId == msg.otherId) {
+			log("Device in contact with itself, ignored.");
 			return;
 		}
 
-		contacts.addContact(msg.getMyId(), msg.getOtherId());
+		contacts.addContact(msg.myId, msg.otherId);
 
 		// To debug we print the contacts each time. (TODO remove)
 		contacts.printContacts();
 	}
 
 	private void onEventOfInterestReportMessage(EventOfInterestReportMessage msg) {
-		System.out.println("Event of interest report received: affectedId " + msg.getAffectedId() + ".");
+		log("Event of interest report received: affectedId " + msg.affectedId + ".");
 
-		final Map<Integer, Long> timestampOfContactsOfSingleDevice = contacts.getTimestampOfContactsOfSingleDevice(msg.getAffectedId());
-		System.out.println("Devices entered in contact with " + msg.getAffectedId() + " are " + timestampOfContactsOfSingleDevice.keySet().toString() + ".");
+		final Map<Integer, Long> timestampOfContactsOfSingleDevice = contacts.getTimestampOfContactsOfAffectedDevice(msg.affectedId);
+		log("Devices entered in contact with " + msg.affectedId + " are " + timestampOfContactsOfSingleDevice.keySet().toString() + ".");
 
 		for(Map.Entry<Integer, Long> entry : timestampOfContactsOfSingleDevice.entrySet())
 			sendNotificationToDevice(entry.getKey(), entry.getValue());
 
-		sender().tell(new EventOfInterestAckMessage(msg.getAffectedId()), self());
+		sender().tell(new EventOfInterestAckMessage(msg.affectedId, msg.region), self());
 	}
 
 	private void sendNotificationToDevice(int deviceId, long timestampOfContact) {
 		final String messageContent = getNotificationMessageContent(deviceId, timestampOfContact);
 		final String topic = MqttUtils.getNotificationTopicForDevice(deviceId);
 		try {
-			System.out.println("Publishing message: \"" + messageContent + "\" to topic \"" + topic + "\".");
+			log("Publishing message: \"" + messageContent + "\" to topic \"" + topic + "\".");
 			final MqttMessage message = new MqttMessage(messageContent.getBytes());
 			message.setQos(MqttUtils.DEFAULT_QOS);
 			mqttProducer.publish(topic, message);
-			System.out.println("Message published.");
+			log("Message published.");
 		} catch(MqttException me) {
 			MqttUtils.logMqttException(me);
 		}
@@ -122,6 +144,10 @@ public class ServerActor extends AbstractActor {
 
 	private String getNotificationMessageContent(int deviceId, long timestampOfContact) {
 		return "{\"notification\":{\"deviceId\":\"" + deviceId + "\",\"timestampOfContact\":\"" + timestampOfContact + "\"}}";
+	}
+
+	private void log(String message) {
+		System.out.println(region + ": " + message);
 	}
 	//endregion
 }

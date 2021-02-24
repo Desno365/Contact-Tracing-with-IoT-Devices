@@ -1,6 +1,6 @@
 package it.polimi.middleware.project1;
 
-import it.polimi.middleware.project1.server.MqttUtils;
+import it.polimi.middleware.project1.utils.MqttUtils;
 import org.eclipse.paho.client.mqttv3.*;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 import org.json.JSONObject;
@@ -58,18 +58,15 @@ public class ProximitySensor {
 		}
 	}
 
-	public void sendSimulatedContactMessage() {
+	public void sendSimulatedContactMessage(int otherDeviceId) {
+		assert deviceId != otherDeviceId;
+
 		if(mqttProducer == null || !mqttProducer.isConnected()) {
 			System.out.println(deviceId + ": not connected.");
 			return;
 		}
 
-		int otherDeviceId = deviceId;
-		while(otherDeviceId == deviceId)
-			otherDeviceId = ProximitySensorsSimulation.getRandomValidDeviceId();
-
 		final String payload = getContactMessage(otherDeviceId);
-
 		try {
 			System.out.println(deviceId + ": publishing message: " + payload + ".");
 			MqttMessage mqttMessage = new MqttMessage(payload.getBytes());

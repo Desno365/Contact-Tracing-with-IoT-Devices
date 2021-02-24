@@ -44,8 +44,17 @@ public class ProximitySensorsSimulation {
 	}
 
 	private static void createSimulatedContact() {
+		// Get a random deviceId.
 		final int deviceId = getRandomValidDeviceId();
-		proximitySensorHashMap.get(deviceId).sendSimulatedContactMessage();
+
+		// Get another deviceId, but make sure that is different from the previous one.
+		int otherDeviceId = deviceId;
+		while(otherDeviceId == deviceId)
+			otherDeviceId = ProximitySensorsSimulation.getRandomValidDeviceId();
+
+		// Send contact message.
+		proximitySensorHashMap.get(deviceId).sendSimulatedContactMessage(otherDeviceId);
+		proximitySensorHashMap.get(otherDeviceId).sendSimulatedContactMessage(deviceId);
 	}
 
 }

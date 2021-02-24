@@ -9,9 +9,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
-public class Contacts implements Serializable, Cloneable {
+public class Contacts implements Serializable {
 
-	private HashMap<Integer, ContactsOfSingleDevice> contactsHashMap = new HashMap<>();
+	private HashMap<Integer, ContactsOfSingleDevice> contactsHashMap;
 
 	/**
 	 * Constructs an empty contacts structure.

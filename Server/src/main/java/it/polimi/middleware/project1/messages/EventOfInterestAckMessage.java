@@ -4,13 +4,11 @@ import java.io.Serializable;
 
 public class EventOfInterestAckMessage implements Serializable {
 
-	private final int affectedId;
+	public final int affectedId;
+	public final String region;
 
-	public int getAffectedId() {
-		return affectedId;
-	}
-
-	public EventOfInterestAckMessage(int affectedId) {
+	public EventOfInterestAckMessage(int affectedId, String region) {
 		this.affectedId = affectedId;
+		this.region = region;
 	}
 }
