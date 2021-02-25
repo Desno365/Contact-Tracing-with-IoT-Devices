@@ -4,7 +4,6 @@ import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
 import akka.actor.Props;
 import com.typesafe.config.Config;
-import com.typesafe.config.ConfigFactory;
 import it.polimi.middleware.project1.messages.EventOfInterestReportMessage;
 import it.polimi.middleware.project1.utils.AkkaUtils;
 
@@ -13,8 +12,10 @@ import java.util.Scanner;
 public class Main {
 
 	public static void main(String[] args) throws InterruptedException {
-		final Config conf = ConfigFactory.parseResources(AkkaUtils.EVENT_OF_INTEREST_REPORTER_CONFIG);
-		final ActorSystem sys = ActorSystem.create(AkkaUtils.ACTOR_SYSTEM_NAME, conf);
+		final int port = args.length > 0 ? Integer.parseInt(args[0]) : 6223;
+
+		final Config config = AkkaUtils.getAkkaConfigWithCustomPort(port);
+		final ActorSystem sys = ActorSystem.create(AkkaUtils.ACTOR_SYSTEM_NAME, config);
 		ActorRef eventOfInterestReporterActorRef = sys.actorOf(Props.create(EventOfInterestReporterActor.class));
 
 		String region = "";
