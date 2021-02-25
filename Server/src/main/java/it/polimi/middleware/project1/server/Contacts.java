@@ -5,7 +5,6 @@ import com.google.gson.reflect.TypeToken;
 
 import java.io.Serializable;
 import java.lang.reflect.Type;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -21,13 +20,11 @@ public class Contacts implements Serializable {
 	}
 
 	/**
-	 * Constructs a contacts structure that is a deep copy of the provided Contacts object.
-	 * @param contacts the contacts structure to be copied.
+	 * Constructs a contacts structure from a json string.
+	 * @param jsonString the json string that contains the contacts.
 	 */
-	public Contacts(Contacts contacts) {
-		ArrayList<Integer> ar = new ArrayList<>();
+	public Contacts(String jsonString) {
 		final Gson gson = new Gson();
-		final String jsonString = gson.toJson(contacts.contactsHashMap);
 		final Type type = new TypeToken<HashMap<Integer, ContactsOfSingleDevice>>(){}.getType();
 		contactsHashMap = gson.fromJson(jsonString, type);
 	}
@@ -36,6 +33,15 @@ public class Contacts implements Serializable {
 	// ##############################################################
 	//region Public methods
 	// ###############################
+
+	/**
+	 * Convert the Contacts structure to a json string.
+	 * @return the json string that contains the contacts.
+	 */
+	public String toJson() {
+		final Gson gson = new Gson();
+		return gson.toJson(contactsHashMap);
+	}
 
 	/**
 	 * Prints the content of the whole contacts structure.

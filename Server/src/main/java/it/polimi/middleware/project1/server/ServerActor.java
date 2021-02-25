@@ -13,10 +13,19 @@ import org.eclipse.paho.client.mqttv3.*;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 import org.json.JSONObject;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.UUID;
 
 public class ServerActor extends AbstractActor {
+
+	private static final boolean LOAD_FROM_DISK = true;
+	private static final boolean DEBUG_CONTACTS_CONTENT = true;
 
 	private final String mqttBroker;
 	private final String region;
@@ -34,6 +43,8 @@ public class ServerActor extends AbstractActor {
 		this.mediatorActorRef = DistributedPubSub.get(getContext().getSystem()).mediator();
 		connectToMqttBroker();
 		subscribeToEventOfInterestTopic();
+		if(LOAD_FROM_DISK)
+			loadState();
 	}
 
 	@Override
@@ -112,8 +123,35 @@ public class ServerActor extends AbstractActor {
 
 		contacts.addContact(msg.myId, msg.otherId);
 
-		// To debug we print the contacts each time. (TODO remove)
-		contacts.printContacts();
+		saveState();
+	}
+
+	private void loadState() {
+		try {
+			String contactsJsonString = Files.readString(Path.of("./servers-state/" + region + ".json"));
+			contacts = new Contacts(contactsJsonString);
+			log("State loaded from file.");
+
+			if(DEBUG_CONTACTS_CONTENT)
+				contacts.printContacts();
+		} catch (FileNotFoundException | NoSuchFileException e) {
+			log("No state found.");
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	private void saveState() {
+		if(DEBUG_CONTACTS_CONTENT)
+			contacts.printContacts();
+
+		final String contactsJsonString = contacts.toJson();
+		try {
+			new File("./servers-state/").mkdirs();
+			Files.writeString(Path.of("./servers-state/" + region + ".json"), contactsJsonString);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 
 	private void onEventOfInterestReportMessage(EventOfInterestReportMessage msg) {
