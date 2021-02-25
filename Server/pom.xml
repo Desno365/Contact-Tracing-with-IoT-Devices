@@ -5,11 +5,12 @@
     <groupId>project1-contiki-ng</groupId>
     <artifactId>project1-contiki-ng</artifactId>
 
-    <name>Simple Project</name>
+    <name>Project 1</name>
     <packaging>jar</packaging>
     <version>1.0</version>
 
     <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <akka.version>2.6.10</akka.version>
@@ -56,13 +57,13 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>RELEASE</version>
+            <version>5.8.0-M1</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
-            <version>5.7.1</version>
+            <version>5.8.0-M1</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
