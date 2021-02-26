@@ -1,17 +1,19 @@
-package it.polimi.middleware.project1.server;
+package it.polimi.middleware.project1.server.datastructures;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
 import java.io.Serializable;
 import java.lang.reflect.Type;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
-public class Contacts implements Serializable, Cloneable {
+/**
+ * This class represents the data structure that is able to contain the information of contacts between devices and also the timestamp of this contact.
+ */
+public class Contacts implements Serializable {
 
-	private HashMap<Integer, ContactsOfSingleDevice> contactsHashMap = new HashMap<>();
+	private final HashMap<Integer, ContactsOfSingleDevice> contactsHashMap;
 
 	/**
 	 * Constructs an empty contacts structure.
@@ -21,13 +23,11 @@ public class Contacts implements Serializable, Cloneable {
 	}
 
 	/**
-	 * Constructs a contacts structure that is a deep copy of the provided Contacts object.
-	 * @param contacts the contacts structure to be copied.
+	 * Constructs a contacts structure from a json string.
+	 * @param jsonString the json string that contains the contacts.
 	 */
-	public Contacts(Contacts contacts) {
-		ArrayList<Integer> ar = new ArrayList<>();
+	public Contacts(String jsonString) {
 		final Gson gson = new Gson();
-		final String jsonString = gson.toJson(contacts.contactsHashMap);
 		final Type type = new TypeToken<HashMap<Integer, ContactsOfSingleDevice>>(){}.getType();
 		contactsHashMap = gson.fromJson(jsonString, type);
 	}
@@ -36,6 +36,15 @@ public class Contacts implements Serializable, Cloneable {
 	// ##############################################################
 	//region Public methods
 	// ###############################
+
+	/**
+	 * Convert the Contacts structure to a json string.
+	 * @return the json string that contains the contacts.
+	 */
+	public String toJson() {
+		final Gson gson = new Gson();
+		return gson.toJson(contactsHashMap);
+	}
 
 	/**
 	 * Prints the content of the whole contacts structure.
@@ -67,7 +76,7 @@ public class Contacts implements Serializable, Cloneable {
 	/**
 	 * Get all the devices that had been in contact with affectedDeviceId, with also the timestamp of the contacts.
 	 * @param affectedDeviceId the id of the device affected.
-	 * @return an hashmap containing the devices that affectedDeviceId entered in contact with (and also the timestamp of the contact).
+	 * @return a <code>Map</code> containing the devices that affectedDeviceId entered in contact with (and also the timestamp of the contact).
 	 */
 	public Map<Integer, Long> getTimestampOfContactsOfAffectedDevice(int affectedDeviceId) {
 		ContactsOfSingleDevice contactsOfSingleDevice = contactsHashMap.get(affectedDeviceId);
