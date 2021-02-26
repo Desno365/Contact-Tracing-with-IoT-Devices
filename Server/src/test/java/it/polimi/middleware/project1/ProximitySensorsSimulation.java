@@ -13,7 +13,7 @@ public class ProximitySensorsSimulation {
 
 	private static final int INITIAL_DELAY_IN_SECONDS = 5;
 	private static final int PERIOD_IN_SECONDS = 5;
-	private static final int STOP_AFTER_SECONDS = 17;
+	private static final int STOP_AFTER_SECONDS = 7;
 
 	private static final HashMap<Integer, ProximitySensor> proximitySensorHashMap = new HashMap<>();
 

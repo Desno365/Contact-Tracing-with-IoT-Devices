@@ -7,6 +7,7 @@ import akka.cluster.pubsub.DistributedPubSubMediator;
 import it.polimi.middleware.project1.messages.ContactMessage;
 import it.polimi.middleware.project1.messages.EventOfInterestAckMessage;
 import it.polimi.middleware.project1.messages.EventOfInterestReportMessage;
+import it.polimi.middleware.project1.messages.RequestSimulatedCrashMessage;
 import it.polimi.middleware.project1.utils.AkkaUtils;
 import it.polimi.middleware.project1.utils.MqttUtils;
 import org.eclipse.paho.client.mqttv3.*;
@@ -20,6 +21,7 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 public class ServerActor extends AbstractActor {
@@ -41,10 +43,6 @@ public class ServerActor extends AbstractActor {
 		this.mqttBroker = mqttBroker;
 		this.region = region;
 		this.mediatorActorRef = DistributedPubSub.get(getContext().getSystem()).mediator();
-		connectToMqttBroker();
-		subscribeToEventOfInterestTopic();
-		if(LOAD_FROM_DISK)
-			loadState();
 	}
 
 	@Override
@@ -53,7 +51,37 @@ public class ServerActor extends AbstractActor {
 				.match(DistributedPubSubMediator.SubscribeAck.class, this::onSubscribeAckMessage)
 				.match(ContactMessage.class, this::onContactMessage)
 				.match(EventOfInterestReportMessage.class, this::onEventOfInterestReportMessage)
+				.match(RequestSimulatedCrashMessage.class, this::onRequestSimulatedCrashMessage)
 				.build();
+	}
+
+	@Override
+	public void preStart() throws Exception {
+		super.preStart();
+		log("Preparing to start...");
+
+		connectToMqttBroker();
+		subscribeToEventOfInterestTopic();
+		if(LOAD_FROM_DISK)
+			loadState();
+	}
+
+	@Override
+	public void preRestart(Throwable reason, Optional<Object> message) throws Exception {
+		super.preRestart(reason, message);
+		log("Preparing to restart...");
+	}
+
+	@Override
+	public void postRestart(Throwable reason) throws Exception {
+		super.postRestart(reason);
+		log("...now restarted!");
+	}
+
+	@Override
+	public void postStop() throws Exception {
+		super.postStop();
+		log("Stopped actor.");
 	}
 
 
@@ -182,6 +210,11 @@ public class ServerActor extends AbstractActor {
 
 	private String getNotificationMessageContent(int deviceId, long timestampOfContact) {
 		return "{\"notification\":{\"deviceId\":\"" + deviceId + "\",\"timestampOfContact\":\"" + timestampOfContact + "\"}}";
+	}
+
+	private void onRequestSimulatedCrashMessage(RequestSimulatedCrashMessage msg) {
+		log("Request of simulated crash received.");
+		log("Crash " + 2/0 + ".");
 	}
 
 	private void log(String message) {

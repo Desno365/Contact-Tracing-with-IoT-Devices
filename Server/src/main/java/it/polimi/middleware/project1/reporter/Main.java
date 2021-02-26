@@ -5,6 +5,7 @@ import akka.actor.ActorSystem;
 import akka.actor.Props;
 import com.typesafe.config.Config;
 import it.polimi.middleware.project1.messages.EventOfInterestReportMessage;
+import it.polimi.middleware.project1.messages.RequestSimulatedCrashMessage;
 import it.polimi.middleware.project1.utils.AkkaUtils;
 
 import java.util.Scanner;
@@ -27,7 +28,12 @@ public class Main {
 					eventOfInterestReporterActorRef.tell(new EventOfInterestReportMessage(affectedId, region, eventOfInterestReporterActorRef), ActorRef.noSender());
 					Thread.sleep(2000);
 				} else {
-					System.out.println("Device id should be a positive number!");
+					if(affectedId == -1) {
+						eventOfInterestReporterActorRef.tell(new RequestSimulatedCrashMessage(region), ActorRef.noSender());
+						Thread.sleep(2000);
+					} else {
+						System.out.println("Device id should be a positive number!");
+					}
 				}
 			}
 		}
@@ -52,7 +58,7 @@ public class Main {
 	private static int insertDeviceId() {
 		Scanner scanner = new Scanner(System.in);
 		System.out.println("##############################################");
-		System.out.println("Enter device id affected by event of interest:");
+		System.out.println("Enter device id affected by event of interest (-1 to simulate crash):");
 		System.out.println("##############################################");
 		try {
 			return scanner.nextInt();
