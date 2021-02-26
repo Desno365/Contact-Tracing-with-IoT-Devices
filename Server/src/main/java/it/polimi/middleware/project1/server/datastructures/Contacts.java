@@ -1,4 +1,4 @@
-package it.polimi.middleware.project1.server;
+package it.polimi.middleware.project1.server.datastructures;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;

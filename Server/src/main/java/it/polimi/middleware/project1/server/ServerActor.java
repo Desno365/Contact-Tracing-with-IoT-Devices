@@ -8,6 +8,7 @@ import it.polimi.middleware.project1.messages.ContactMessage;
 import it.polimi.middleware.project1.messages.EventOfInterestAckMessage;
 import it.polimi.middleware.project1.messages.EventOfInterestReportMessage;
 import it.polimi.middleware.project1.messages.RequestSimulatedCrashMessage;
+import it.polimi.middleware.project1.server.datastructures.Contacts;
 import it.polimi.middleware.project1.utils.AkkaUtils;
 import it.polimi.middleware.project1.utils.MqttUtils;
 import org.eclipse.paho.client.mqttv3.*;
