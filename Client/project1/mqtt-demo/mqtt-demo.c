@@ -115,8 +115,7 @@ static uint8_t state;
 #define DEFAULT_PUBLISH_INTERVAL    (60 * CLOCK_SECOND)
 #define DEFAULT_KEEP_ALIVE_TIMER    60
 /*---------------------------------------------------------------------------*/
-PROCESS_NAME(mqtt_demo_process);
-AUTOSTART_PROCESSES(&mqtt_demo_process);
+
 /*---------------------------------------------------------------------------*/
 /**
  * \brief Data structure declaration for the MQTT client configuration
@@ -161,7 +160,9 @@ static uint16_t seq_nr_value = 0;
 /*---------------------------------------------------------------------------*/
 static mqtt_client_config_t conf;
 /*---------------------------------------------------------------------------*/
-PROCESS(mqtt_demo_process, "MQTT Demo");
+PROCESS(mqtt_demo_process, "mqtt process");
+PROCESS(find_contacts, "find contacts");
+AUTOSTART_PROCESSES(&mqtt_demo_process, &find_contacts);
 /*---------------------------------------------------------------------------*/
 int
 ipaddr_sprintf(char *buf, uint8_t buf_len, const uip_ipaddr_t *addr)
@@ -592,6 +593,12 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
   }
 	
   PROCESS_END();
+}
+/*---------------------------------------------------------------------------*/
+PROCESS_THREAD(find_contacts, ev, data)
+{
+	PROCESS_BEGIN();
+	PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
 /**
