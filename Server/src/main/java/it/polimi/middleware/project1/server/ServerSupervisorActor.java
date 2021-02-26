@@ -8,6 +8,10 @@ import akka.japi.pf.DeciderBuilder;
 
 import java.time.Duration;
 
+/**
+ * This class represents the server supervisor actor.
+ * This supervisor is able to manage exceptions of the server actor and restart the server if needed.
+ */
 public class ServerSupervisorActor extends AbstractActor {
 
 	// #strategy

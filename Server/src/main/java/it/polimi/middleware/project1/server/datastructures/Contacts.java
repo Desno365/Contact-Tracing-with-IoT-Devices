@@ -8,9 +8,12 @@ import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * This class represents the data structure that is able to contain the information of contacts between devices and also the timestamp of this contact.
+ */
 public class Contacts implements Serializable {
 
-	private HashMap<Integer, ContactsOfSingleDevice> contactsHashMap;
+	private final HashMap<Integer, ContactsOfSingleDevice> contactsHashMap;
 
 	/**
 	 * Constructs an empty contacts structure.
@@ -73,7 +76,7 @@ public class Contacts implements Serializable {
 	/**
 	 * Get all the devices that had been in contact with affectedDeviceId, with also the timestamp of the contacts.
 	 * @param affectedDeviceId the id of the device affected.
-	 * @return an hashmap containing the devices that affectedDeviceId entered in contact with (and also the timestamp of the contact).
+	 * @return a <code>Map</code> containing the devices that affectedDeviceId entered in contact with (and also the timestamp of the contact).
 	 */
 	public Map<Integer, Long> getTimestampOfContactsOfAffectedDevice(int affectedDeviceId) {
 		ContactsOfSingleDevice contactsOfSingleDevice = contactsHashMap.get(affectedDeviceId);

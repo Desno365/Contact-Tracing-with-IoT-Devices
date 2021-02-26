@@ -7,6 +7,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Emulates the IOT proximity sensors.
+ */
 public class ProximitySensorsSimulation {
 
 	public static final int NUMBER_OF_SENSORS = 10;

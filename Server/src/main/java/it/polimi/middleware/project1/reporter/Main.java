@@ -15,10 +15,16 @@ public class Main {
 	public static void main(String[] args) throws InterruptedException {
 		final int port = args.length > 0 ? Integer.parseInt(args[0]) : 6223;
 
+		// Obtain the Akka config but with a custom port.
 		final Config config = AkkaUtils.getAkkaConfigWithCustomPort(port);
+
+		// Instantiate the ActorSystem.
 		final ActorSystem sys = ActorSystem.create(AkkaUtils.ACTOR_SYSTEM_NAME, config);
+
+		// Instantiate EventOfInterestReporterActor.
 		ActorRef eventOfInterestReporterActorRef = sys.actorOf(Props.create(EventOfInterestReporterActor.class));
 
+		// While loop to ask for an event of interest.
 		String region = "";
 		while(isNotExitCommand(region)) {
 			region = insertRegion();

@@ -25,6 +25,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * This class represents the server actor in a certain region.
+ * The server actor of a certain region is able to receive the contacts of devices assigned to that region,
+ * and is also able to send notifications to devices when a device they entered in contact with had an event of interest.
+ */
 public class ServerActor extends AbstractActor {
 
 	private static final boolean LOAD_FROM_DISK = true;
@@ -49,7 +54,7 @@ public class ServerActor extends AbstractActor {
 	@Override
 	public Receive createReceive() {
 		return receiveBuilder()
-				.match(DistributedPubSubMediator.SubscribeAck.class, this::onSubscribeAckMessage)
+				.match(DistributedPubSubMediator.SubscribeAck.class, this::onAkkaPubSubSubscribeAckMessage)
 				.match(ContactMessage.class, this::onContactMessage)
 				.match(EventOfInterestReportMessage.class, this::onEventOfInterestReportMessage)
 				.match(RequestSimulatedCrashMessage.class, this::onRequestSimulatedCrashMessage)
@@ -138,7 +143,7 @@ public class ServerActor extends AbstractActor {
 		mediatorActorRef.tell(new DistributedPubSubMediator.Subscribe(topic, getSelf()), getSelf());
 	}
 
-	void onSubscribeAckMessage(DistributedPubSubMediator.SubscribeAck msg) {
+	void onAkkaPubSubSubscribeAckMessage(DistributedPubSubMediator.SubscribeAck msg) {
 		log("Akka Pub/Sub: Subscribed.");
 	}
 

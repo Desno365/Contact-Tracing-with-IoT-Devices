@@ -21,9 +21,16 @@ public class Main {
 		final String region = args.length > 0 ? args[0] : "region1";
 		final int port = args.length > 1 ? Integer.parseInt(args[1]) : 6123;
 
+		// Obtain the Akka config but with a custom port.
 		final Config config = AkkaUtils.getAkkaConfigWithCustomPort(port);
+
+		// Instantiate the ActorSystem.
 		final ActorSystem sys = ActorSystem.create(AkkaUtils.ACTOR_SYSTEM_NAME, config);
+
+		// Instantiate ServerSupervisorActor for this region.
 		final ActorRef supervisorActorRef = sys.actorOf(Props.create(ServerSupervisorActor.class), "ServerSupervisorActor-" + region);
+
+		// Ask the ServerSupervisorActor to instantiate the ServerActor in this region.
 		scala.concurrent.Future<Object> waitingForServer = ask(supervisorActorRef, Props.create(ServerActor.class, MqttUtils.DEFAULT_BROKER, region), DEFAULT_TIMEOUT_IN_MILLISECONDS);
 		try {
 			final ActorRef serverActorRef = (ActorRef) waitingForServer.result(DEFAULT_TIMEOUT_DURATION, null);
