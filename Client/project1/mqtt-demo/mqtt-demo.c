@@ -349,7 +349,6 @@ subscribe(void)
   }
 }
 /*---------------------------------------------------------------------------*/
-#define CONTACT_INFO_LENGTH 33
 static void
 publish(void)
 {
@@ -361,8 +360,8 @@ publish(void)
 
   buf_ptr = app_buffer;
 
-  len = snprintf(buf_ptr, CONTACT_INFO_LENGTH,
-                 "id:%d;otherId:%u.\\0",r,otherId); 
+  len = snprintf(buf_ptr, remaining,
+                 "{\"d\":{\"myId\":%d,cd\"otherId\":%u",r,otherId); 
 
   if(len < 0 || len >= remaining) {
     LOG_ERR("Buffer too short. Have %d, need %d + \\0\n", remaining, len);
@@ -372,20 +371,20 @@ publish(void)
   remaining -= len;
   buf_ptr += len;
 
-  /* Put our Default route's string representation in a buffer */
-  char def_rt_str[64];
-  memset(def_rt_str, 0, sizeof(def_rt_str));
-  ipaddr_sprintf(def_rt_str, sizeof(def_rt_str), uip_ds6_defrt_choose());
+  // /* Put our Default route's string representation in a buffer */
+  // char def_rt_str[64];
+  // memset(def_rt_str, 0, sizeof(def_rt_str));
+  // ipaddr_sprintf(def_rt_str, sizeof(def_rt_str), uip_ds6_defrt_choose());
 
-  len = snprintf(buf_ptr, remaining, ",\"Def Route\":\"%s\"",
-                 def_rt_str);
+  // len = snprintf(buf_ptr, remaining, ",\"Def Route\":\"%s\"",
+  //                def_rt_str);
 
-  if(len < 0 || len >= remaining) {
-    LOG_ERR("Buffer too short. Have %d, need %d + \\0\n", remaining, len);
-    return;
-  }
-  remaining -= len;
-  buf_ptr += len;
+  // if(len < 0 || len >= remaining) {
+  //   LOG_ERR("Buffer too short. Have %d, need %d + \\0\n", remaining, len);
+  //   return;
+  // }
+  // remaining -= len;
+  // buf_ptr += len;
 
   len = snprintf(buf_ptr, remaining, "}}");
 
@@ -393,9 +392,9 @@ publish(void)
     LOG_ERR("Buffer too short. Have %d, need %d + \\0\n", remaining, len);
     return;
   }
-
+  LOG_INFO("Publishing with: %s\n",app_buffer);
   mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer,
-               strlen(app_buffer), MQTT_QOS_LEVEL_0, MQTT_RETAIN_OFF);
+               strlen(app_buffer), MQTT_QOS_LEVEL_0, MQTT_RETAIN_OFF);  
 
   LOG_INFO("Publish sent out!\n");
 }
