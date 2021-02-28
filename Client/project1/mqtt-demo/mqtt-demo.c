@@ -1,43 +1,3 @@
-/*
- * Copyright (c) 2014, Texas Instruments Incorporated - http://www.ti.com/
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE
- * COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
- * OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-/*---------------------------------------------------------------------------*/
-/** 
- *
- * Demonstrates MQTT functionality using a local Mosquitto borker. 
- * Published messages include a fake temperature reading.
- * @{
- *
- * \file
- * An MQTT example 
- */
-/*---------------------------------------------------------------------------*/
 #include "contiki.h"
 #include "mqtt.h"
 #include "rpl.h"
@@ -155,8 +115,11 @@ static char app_buffer[APP_BUFFER_SIZE];
 static struct mqtt_message *msg_ptr = 0;
 static struct etimer publish_periodic_timer;
 static struct ctimer ct;
+static process_event_t publish_event;
 static char *buf_ptr;
 static uint16_t seq_nr_value = 0;
+static int r = -1;
+static unsigned otherId;
 /*---------------------------------------------------------------------------*/
 static mqtt_client_config_t conf;
 /*---------------------------------------------------------------------------*/
@@ -386,6 +349,7 @@ subscribe(void)
   }
 }
 /*---------------------------------------------------------------------------*/
+#define CONTACT_INFO_LENGTH 33
 static void
 publish(void)
 {
@@ -397,8 +361,8 @@ publish(void)
 
   buf_ptr = app_buffer;
 
-  len = snprintf(buf_ptr, remaining,
-                 "test");  //TODO fix
+  len = snprintf(buf_ptr, CONTACT_INFO_LENGTH,
+                 "id:%d;otherId:%u.\\0",r,otherId); 
 
   if(len < 0 || len >= remaining) {
     LOG_ERR("Buffer too short. Have %d, need %d + \\0\n", remaining, len);
@@ -585,23 +549,107 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
       state_machine();
     }
     
-    if(0){
+    if(ev==publish_event){
     	publish_state();
     }
     
-
   }
 	
   PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
+#define WITH_SERVER_REPLY  1
+#define UDP_CLIENT_PORT	8765
+#define UDP_SERVER_PORT	5678
+
+#define START_INTERVAL		(15 * CLOCK_SECOND)
+#define SEND_INTERVAL		  (60 * CLOCK_SECOND)
+
+static struct simple_udp_connection udp_conn_as_parent;
+static struct simple_udp_connection udp_conn_as_son;
+
+static void
+udp_rx_callback_parent(struct simple_udp_connection *c,
+         const uip_ipaddr_t *sender_addr,
+         uint16_t sender_port,
+         const uip_ipaddr_t *receiver_addr,
+         uint16_t receiver_port,
+         const uint8_t *data,
+         uint16_t datalen)
+{
+  unsigned count = *(unsigned *)data;
+  LOG_INFO("Received id %u from ", count);
+  LOG_INFO_6ADDR(sender_addr);
+  LOG_INFO_("\n");
+  otherId = count;
+  process_post(&mqtt_demo_process, publish_event, &count);
+  LOG_INFO("Sending response %u to ", r);
+  LOG_INFO_6ADDR(sender_addr);
+  LOG_INFO_("\n");
+  simple_udp_sendto(&udp_conn_as_parent, &r, sizeof(r), sender_addr);
+}
+
+static void
+udp_rx_callback_son(struct simple_udp_connection *c,
+         const uip_ipaddr_t *sender_addr,
+         uint16_t sender_port,
+         const uip_ipaddr_t *receiver_addr,
+         uint16_t receiver_port,
+         const uint8_t *data,
+         uint16_t datalen)
+{
+  unsigned count = *(unsigned *)data;
+  LOG_INFO("Received id %u from ", count);
+  LOG_INFO_6ADDR(sender_addr);
+  LOG_INFO_("\n");
+  otherId=count;
+  process_post(&mqtt_demo_process, publish_event, &count);
+}
+
+
 PROCESS_THREAD(find_contacts, ev, data)
 {
+  static struct etimer periodic_timer;
+  uip_ipaddr_t parent_ipaddr,temp; 
+
+  if(r==-1) r=rand();
+
 	PROCESS_BEGIN();
+  /* Allocate the publish event */
+  publish_event=process_alloc_event();
+
+  /* Initialize UDP connection with parent */
+  simple_udp_register(&udp_conn_as_son, UDP_CLIENT_PORT, NULL,
+                      UDP_SERVER_PORT, udp_rx_callback_son);
+  /* Initialize UDP connection with sons */
+  simple_udp_register(&udp_conn_as_parent, UDP_SERVER_PORT, NULL,
+                      UDP_CLIENT_PORT, udp_rx_callback_parent);
+
+  /* Set interval after which check if something has changed */ 
+  etimer_set(&periodic_timer, random_rand() % SEND_INTERVAL);
+  while(1) {
+    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&periodic_timer));
+
+    if(NETSTACK_ROUTING.node_is_reachable()) {
+      /* Send to DAG root */
+      rpl_dag_t * dag = rpl_get_any_dag();
+      temp =  *rpl_parent_get_ipaddr(dag->preferred_parent);
+      if(parent_ipaddr.u16!=temp.u16 || parent_ipaddr.u8!=temp.u8){
+        parent_ipaddr = temp;
+        LOG_INFO("My new parent is");
+        LOG_INFO_6ADDR(&parent_ipaddr);
+        simple_udp_sendto(&udp_conn_as_son, &r, sizeof(r), &parent_ipaddr);
+      }
+    } else {
+      LOG_INFO("Not reachable yet\n");
+    }
+
+    /* Add some jitter */
+    etimer_set(&periodic_timer, SEND_INTERVAL
+      - CLOCK_SECOND + (random_rand() % (2 * CLOCK_SECOND)));
+  }
+
 	PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
-/**
- * @}
- * @}
- */
+
