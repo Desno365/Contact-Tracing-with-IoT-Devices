@@ -46,8 +46,9 @@
 #define MQTT_DEMO_TRIGGER_LED LEDS_RED
 #define MQTT_DEMO_PUBLISH_TRIGGER &button_left_sensor
 
-#define MQTT_DEMO_PUBLISH_TOPIC   "AccordiBurattiMotta-Topic/contact/json"
-#define MQTT_DEMO_SUB_TOPIC       "AccordiBurattiMotta-Topic/notif/sensorX/json"
+#define MQTT_DEMO_PUBLISH_TOPIC   "AccordiBurattiMotta-Topic/contact/region1/json"
+#define MQTT_DEMO_SUB_TOPIC       "AccordiBurattiMotta-Topic/notif/sensor"
+#define MQTT_DEMO_SUB_TOPIC_END   "/json" 
 
 #define MQTT_DEMO_BROKER_IP_ADDR "fd00::1"
 //*---------------------------------------------------------------------------*/

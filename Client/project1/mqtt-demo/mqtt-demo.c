@@ -1,3 +1,43 @@
+/*
+ * Copyright (c) 2014, Texas Instruments Incorporated - http://www.ti.com/
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the copyright holder nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE
+ * COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+ * OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+/*---------------------------------------------------------------------------*/
+/** 
+ *
+ * Demonstrates MQTT functionality using a local Mosquitto borker. 
+ * Published messages include a fake temperature reading.
+ * @{
+ *
+ * \file
+ * An MQTT example 
+ */
+/*---------------------------------------------------------------------------*/
 #include "contiki.h"
 #include "mqtt.h"
 #include "rpl.h"
@@ -48,6 +88,7 @@ static uint8_t connect_attempt;
 /*---------------------------------------------------------------------------*/
 /* Various states */
 static uint8_t state;
+#define STATE_INIT            0
 #define STATE_REGISTERED      1
 #define STATE_CONNECTING      2
 #define STATE_CONNECTED       3
@@ -75,7 +116,8 @@ static uint8_t state;
 #define DEFAULT_PUBLISH_INTERVAL    (60 * CLOCK_SECOND)
 #define DEFAULT_KEEP_ALIVE_TIMER    60
 /*---------------------------------------------------------------------------*/
-
+PROCESS_NAME(mqtt_demo_process);
+AUTOSTART_PROCESSES(&mqtt_demo_process);
 /*---------------------------------------------------------------------------*/
 /**
  * \brief Data structure declaration for the MQTT client configuration
@@ -115,17 +157,15 @@ static char app_buffer[APP_BUFFER_SIZE];
 static struct mqtt_message *msg_ptr = 0;
 static struct etimer publish_periodic_timer;
 static struct ctimer ct;
-static process_event_t publish_event;
 static char *buf_ptr;
+static process_event_t publish_event;
 static uint16_t seq_nr_value = 0;
 static int r = -1;
 static unsigned otherId;
 /*---------------------------------------------------------------------------*/
 static mqtt_client_config_t conf;
 /*---------------------------------------------------------------------------*/
-PROCESS(mqtt_demo_process, "mqtt process");
-PROCESS(find_contacts, "find contacts");
-AUTOSTART_PROCESSES(&mqtt_demo_process, &find_contacts);
+PROCESS(mqtt_demo_process, "MQTT Demo");
 /*---------------------------------------------------------------------------*/
 int
 ipaddr_sprintf(char *buf, uint8_t buf_len, const uip_ipaddr_t *addr)
@@ -238,7 +278,13 @@ construct_pub_topic(void)
 static int
 construct_sub_topic(void)
 {
-  int len = snprintf(sub_topic, BUFFER_SIZE, MQTT_DEMO_SUB_TOPIC);
+  char * buff = sub_topic;
+  int len = snprintf(buff, BUFFER_SIZE, MQTT_DEMO_SUB_TOPIC);
+  buff += len;
+  len = snprintf(buff,BUFFER_SIZE, "%d", r);
+  buff += len;
+  len = snprintf(buff,BUFFER_SIZE, "/json");
+  LOG_INFO("sub topic %s",sub_topic);
 
   /* len < 0: Error. Len >= BUFFER_SIZE: Buffer too small */
   if(len < 0 || len >= BUFFER_SIZE) {
@@ -290,21 +336,8 @@ update_config(void)
 
   /* Reset the counter */
   seq_nr_value = 0;
-  
-  /* If we have just been configured register MQTT connection */
-    mqtt_register(&conn, &mqtt_demo_process, client_id, mqtt_event,
-                  MAX_TCP_SEGMENT_SIZE);
 
-    mqtt_set_username_password(&conn, "use-token-auth",
-                                   conf.auth_token);
-
-    /* _register() will set auto_reconnect; we don't want that */
-    conn.auto_reconnect = 0;
-    connect_attempt = 1;
-
-    state = STATE_REGISTERED;
-    LOG_INFO("Init\n");
-    /* Continue */
+  state = STATE_INIT;
 
   /*
    * Schedule next timer event ASAP
@@ -314,7 +347,6 @@ update_config(void)
    * Since the error at this stage is a config error, we will only exit this
    * error state if we get a new config
    */
-   //TODO first Timer starts here
   etimer_set(&publish_periodic_timer, 0);
 
   return;
@@ -349,6 +381,7 @@ subscribe(void)
   }
 }
 /*---------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------*/
 static void
 publish(void)
 {
@@ -361,7 +394,11 @@ publish(void)
   buf_ptr = app_buffer;
 
   len = snprintf(buf_ptr, remaining,
-                 "{\"d\":{\"myId\":%d,cd\"otherId\":%u",r,otherId); 
+                 "{"
+                 "\"contact\":{"
+                 "\"myId\":%d,"
+                 "\"ohterId\":%d"
+                 , r,otherId); 
 
   if(len < 0 || len >= remaining) {
     LOG_ERR("Buffer too short. Have %d, need %d + \\0\n", remaining, len);
@@ -371,30 +408,15 @@ publish(void)
   remaining -= len;
   buf_ptr += len;
 
-  // /* Put our Default route's string representation in a buffer */
-  // char def_rt_str[64];
-  // memset(def_rt_str, 0, sizeof(def_rt_str));
-  // ipaddr_sprintf(def_rt_str, sizeof(def_rt_str), uip_ds6_defrt_choose());
-
-  // len = snprintf(buf_ptr, remaining, ",\"Def Route\":\"%s\"",
-  //                def_rt_str);
-
-  // if(len < 0 || len >= remaining) {
-  //   LOG_ERR("Buffer too short. Have %d, need %d + \\0\n", remaining, len);
-  //   return;
-  // }
-  // remaining -= len;
-  // buf_ptr += len;
-
   len = snprintf(buf_ptr, remaining, "}}");
 
   if(len < 0 || len >= remaining) {
     LOG_ERR("Buffer too short. Have %d, need %d + \\0\n", remaining, len);
     return;
   }
-  LOG_INFO("Publishing with: %s\n",app_buffer);
+
   mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer,
-               strlen(app_buffer), MQTT_QOS_LEVEL_0, MQTT_RETAIN_OFF);  
+               strlen(app_buffer), MQTT_QOS_LEVEL_0, MQTT_RETAIN_OFF);
 
   LOG_INFO("Publish sent out!\n");
 }
@@ -413,7 +435,21 @@ static void
 state_machine(void)
 {
   switch(state) {
-    
+  case STATE_INIT:
+    /* If we have just been configured register MQTT connection */
+    mqtt_register(&conn, &mqtt_demo_process, client_id, mqtt_event,
+                  MAX_TCP_SEGMENT_SIZE);
+
+    mqtt_set_username_password(&conn, "use-token-auth",
+                                   conf.auth_token);
+
+    /* _register() will set auto_reconnect; we don't want that */
+    conn.auto_reconnect = 0;
+    connect_attempt = 1;
+
+    state = STATE_REGISTERED;
+    LOG_INFO("Init\n");
+    /* Continue */
   case STATE_REGISTERED:
     if(uip_ds6_get_global(ADDR_PREFERRED) != NULL) {
       /* Registered and with a global IPv6 address, connect! */
@@ -432,7 +468,48 @@ state_machine(void)
     /* Not connected yet. Wait */
     LOG_INFO("Connecting: retry %u...\n", connect_attempt);
     break;
-  
+  case STATE_CONNECTED:
+    break;
+  case STATE_PUBLISHING:
+    /* If the timer expired, the connection is stable */
+    if(timer_expired(&connection_life)) {
+      /*
+       * Intentionally using 0 here instead of 1: We want RECONNECT_ATTEMPTS
+       * attempts if we disconnect after a successful connect
+       */
+      connect_attempt = 0;
+    }
+
+    if(mqtt_ready(&conn) && conn.out_buffer_sent) {
+      /* Connected; publish */
+      if(state == STATE_CONNECTED) {
+        subscribe();
+        // state = STATE_PUBLISHING;
+      } else {
+        leds_on(MQTT_DEMO_STATUS_LED);
+        ctimer_set(&ct, PUBLISH_LED_ON_DURATION, publish_led_off, NULL);
+        publish();
+      }
+      etimer_set(&publish_periodic_timer, conf.pub_interval);
+
+      LOG_INFO("Publishing\n");
+      /* Return here so we don't end up rescheduling the timer */
+      return;
+    } else {
+      /*
+       * Our publish timer fired, but some MQTT packet is already in flight
+       * (either not sent at all, or sent but not fully ACKd)
+       *
+       * This can mean that we have lost connectivity to our broker or that
+       * simply there is some network delay. In both cases, we refuse to
+       * trigger a new message and we wait for TCP to either ACK the entire
+       * packet after retries, or to timeout and notify us
+       */
+      LOG_INFO("Publishing... (MQTT state=%d, q=%u)\n", conn.state,
+          conn.out_queue_full);
+    }
+    state = STATE_CONNECTED;
+    break;
   case STATE_DISCONNECTED:
     LOG_INFO("Disconnected\n");
     if(connect_attempt < RECONNECT_ATTEMPTS ||
@@ -461,13 +538,6 @@ state_machine(void)
     /* Idle away. The only way out is a new config */
     LOG_ERR("Bad configuration.\n");
     return;
-    
-  case STATE_CONNECTED:
-  case STATE_PUBLISHING:
-  	LOG_INFO("works\n");
-  	etimer_set(&publish_periodic_timer, conf.pub_interval);
-  	return;
-  	break;
   case STATE_ERROR:
   default:
     leds_on(MQTT_DEMO_STATUS_LED);
@@ -483,78 +553,6 @@ state_machine(void)
 
   /* If we didn't return so far, reschedule ourselves */
   etimer_set(&publish_periodic_timer, STATE_MACHINE_PERIODIC);
-}
-/*---------------------------------------------------------------------------*/
-static void publish_state(void){
-	switch (state){
-		case STATE_CONNECTED:
-  		case STATE_PUBLISHING:
-		/* If the timer expired, the connection is stable */
-		if(timer_expired(&connection_life)) {
-		  /*
-		   * Intentionally using 0 here instead of 1: We want RECONNECT_ATTEMPTS
-		   * attempts if we disconnect after a successful connect
-		   */
-		  connect_attempt = 0;
-		}
-
-		if(mqtt_ready(&conn) && conn.out_buffer_sent) {
-		  /* Connected; publish */
-		  if(state == STATE_CONNECTED) {
-		    subscribe();
-		    state = STATE_PUBLISHING;
-		  } else {
-		    leds_on(MQTT_DEMO_STATUS_LED);
-		    ctimer_set(&ct, PUBLISH_LED_ON_DURATION, publish_led_off, NULL);
-		    publish();
-		  }
-
-		  LOG_INFO("Publishing\n");
-		  /* Return here so we don't end up rescheduling the timer */
-		  return;
-		} else {
-		  /*
-		   * Our publish timer fired, but some MQTT packet is already in flight
-		   * (either not sent at all, or sent but not fully ACKd)
-		   *
-		   * This can mean that we have lost connectivity to our broker or that
-		   * simply there is some network delay. In both cases, we refuse to
-		   * trigger a new message and we wait for TCP to either ACK the entire
-		   * packet after retries, or to timeout and notify us
-		   */
-		  LOG_INFO("Publishing... (MQTT state=%d, q=%u)\n", conn.state,
-		      conn.out_queue_full);
-		}
-		break;
-	}
-}
-
-PROCESS_THREAD(mqtt_demo_process, ev, data)
-{
-
-  PROCESS_BEGIN();
-
-  LOG_INFO("MQTT Demo Process\n");
-
-  init_config();
-  update_config();
-
-  /* Main loop */
-  while(1) {
-
-    PROCESS_YIELD();
-
-    if (ev == PROCESS_EVENT_TIMER && data == &publish_periodic_timer) {
-      state_machine();
-    }
-    
-    if(ev==publish_event){
-    	publish_state();
-    }
-    
-  }
-	
-  PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
 #define WITH_SERVER_REPLY  1
@@ -581,7 +579,8 @@ udp_rx_callback_parent(struct simple_udp_connection *c,
   LOG_INFO_6ADDR(sender_addr);
   LOG_INFO_("\n");
   otherId = count;
-  process_post(&mqtt_demo_process, publish_event, &count);
+  state=STATE_PUBLISHING;
+  state_machine();
   LOG_INFO("Sending response %u to ", r);
   LOG_INFO_6ADDR(sender_addr);
   LOG_INFO_("\n");
@@ -602,21 +601,17 @@ udp_rx_callback_son(struct simple_udp_connection *c,
   LOG_INFO_6ADDR(sender_addr);
   LOG_INFO_("\n");
   otherId=count;
-  process_post(&mqtt_demo_process, publish_event, &count);
+  state=STATE_PUBLISHING;
+  state_machine();
 }
 
-
-PROCESS_THREAD(find_contacts, ev, data)
+PROCESS_THREAD(mqtt_demo_process, ev, data)
 {
-  static struct etimer periodic_timer;
-  uip_ipaddr_t parent_ipaddr,temp; 
+  static uip_ipaddr_t parent_ipaddr,temp; 
 
   if(r==-1) r=rand();
 
-	PROCESS_BEGIN();
-  /* Allocate the publish event */
-  publish_event=process_alloc_event();
-
+  PROCESS_BEGIN();
   /* Initialize UDP connection with parent */
   simple_udp_register(&udp_conn_as_son, UDP_CLIENT_PORT, NULL,
                       UDP_SERVER_PORT, udp_rx_callback_son);
@@ -624,31 +619,93 @@ PROCESS_THREAD(find_contacts, ev, data)
   simple_udp_register(&udp_conn_as_parent, UDP_SERVER_PORT, NULL,
                       UDP_CLIENT_PORT, udp_rx_callback_parent);
 
-  /* Set interval after which check if something has changed */ 
-  etimer_set(&periodic_timer, random_rand() % SEND_INTERVAL);
+  LOG_INFO("MQTT Demo Process\n");
+
+  init_config();
+  update_config();
+
+  /* Main loop */
   while(1) {
-    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&periodic_timer));
 
-    if(NETSTACK_ROUTING.node_is_reachable()) {
-      /* Send to DAG root */
-      rpl_dag_t * dag = rpl_get_any_dag();
-      temp =  *rpl_parent_get_ipaddr(dag->preferred_parent);
-      if(parent_ipaddr.u16!=temp.u16 || parent_ipaddr.u8!=temp.u8){
-        parent_ipaddr = temp;
-        LOG_INFO("My new parent is");
-        LOG_INFO_6ADDR(&parent_ipaddr);
-        simple_udp_sendto(&udp_conn_as_son, &r, sizeof(r), &parent_ipaddr);
+    PROCESS_YIELD();
+
+    if (ev == PROCESS_EVENT_TIMER && data == &publish_periodic_timer) {
+      state_machine();
+      if(state==STATE_CONNECTED){
+        if(NETSTACK_ROUTING.node_is_reachable()) {
+            /* Send to DAG root */
+            rpl_dag_t * dag = rpl_get_any_dag();
+            temp =  *rpl_parent_get_ipaddr(dag->preferred_parent);
+            LOG_INFO("%d %d \n",parent_ipaddr.u16,parent_ipaddr.u8);
+            if(parent_ipaddr.u16!=temp.u16){
+                parent_ipaddr = temp;
+                LOG_INFO("My new parent is");
+                LOG_INFO_6ADDR(&parent_ipaddr);
+                simple_udp_sendto(&udp_conn_as_son, &r, sizeof(r), &parent_ipaddr);
+            }
+        } else {
+            LOG_INFO("Not reachable yet\n");
+        }
       }
-    } else {
-      LOG_INFO("Not reachable yet\n");
     }
+    if(ev==publish_event){
+      state=STATE_PUBLISHING;
+      state_machine();
+    }
+    
 
-    /* Add some jitter */
-    etimer_set(&periodic_timer, SEND_INTERVAL
-      - CLOCK_SECOND + (random_rand() % (2 * CLOCK_SECOND)));
   }
 
-	PROCESS_END();
+  PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
+// /*---------------------------------------------------------------------------*/
+
+
+// PROCESS_THREAD(find_contacts, ev, data)
+// {
+//   static struct etimer periodic_timer;
+//   uip_ipaddr_t parent_ipaddr,temp; 
+
+//   if(r==-1) r=rand();
+
+// 	PROCESS_BEGIN();
+//   /* Allocate the publish event */
+//   publish_event=process_alloc_event();
+
+//   /* Initialize UDP connection with parent */
+//   simple_udp_register(&udp_conn_as_son, UDP_CLIENT_PORT, NULL,
+//                       UDP_SERVER_PORT, udp_rx_callback_son);
+//   /* Initialize UDP connection with sons */
+//   simple_udp_register(&udp_conn_as_parent, UDP_SERVER_PORT, NULL,
+//                       UDP_CLIENT_PORT, udp_rx_callback_parent);
+
+//   /* Set interval after which check if something has changed */ 
+//   etimer_set(&periodic_timer, random_rand() % SEND_INTERVAL);
+//   while(1) {
+//     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&periodic_timer));
+
+//     if(NETSTACK_ROUTING.node_is_reachable()) {
+//       /* Send to DAG root */
+//       rpl_dag_t * dag = rpl_get_any_dag();
+//       temp =  *rpl_parent_get_ipaddr(dag->preferred_parent);
+//       if(parent_ipaddr.u16!=temp.u16 || parent_ipaddr.u8!=temp.u8){
+//         parent_ipaddr = temp;
+//         LOG_INFO("My new parent is");
+//         LOG_INFO_6ADDR(&parent_ipaddr);
+//         simple_udp_sendto(&udp_conn_as_son, &r, sizeof(r), &parent_ipaddr);
+//       }
+//     } else {
+//       LOG_INFO("Not reachable yet\n");
+//     }
+
+//     /* Add some jitter */
+//     etimer_set(&periodic_timer, SEND_INTERVAL
+//       - CLOCK_SECOND + (random_rand() % (2 * CLOCK_SECOND)));
+//   }
+
+// 	PROCESS_END();
+// }
+// /*---------------------------------------------------------------------------*/
+
 
