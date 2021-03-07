@@ -94,6 +94,7 @@ static uint8_t state;
 #define STATE_CONNECTED       3
 #define STATE_PUBLISHING      4
 #define STATE_DISCONNECTED    5
+#define STATE_SUBSCRIBE       7
 #define STATE_NEWCONFIG       6
 #define STATE_CONFIG_ERROR 0xFE
 #define STATE_ERROR        0xFF
@@ -162,6 +163,7 @@ static process_event_t publish_event;
 static uint16_t seq_nr_value = 0;
 static int r = -1;
 static unsigned otherId;
+static bool hasSubscribed;
 /*---------------------------------------------------------------------------*/
 static mqtt_client_config_t conf;
 /*---------------------------------------------------------------------------*/
@@ -213,13 +215,47 @@ pub_handler(const char *topic, uint16_t topic_len, const uint8_t *chunk,
 }
 /*---------------------------------------------------------------------------*/
 static void
+subscribe(void)
+{
+  mqtt_status_t status;
+
+  status = mqtt_subscribe(&conn, NULL, sub_topic, MQTT_QOS_LEVEL_0);
+
+  LOG_INFO("Subscribing\n");
+  if(status == MQTT_STATUS_OUT_QUEUE_FULL) {
+    LOG_INFO("Tried to subscribe but command queue was full!\n");
+  }
+  hasSubscribed=true;
+}
+/*---------------------------------------------------------------------------*/
+static int
+construct_sub_topic(void)
+{
+  char * buff = sub_topic;
+  int len = snprintf(buff, BUFFER_SIZE, MQTT_DEMO_SUB_TOPIC);
+  buff += len;
+  len = snprintf(buff,BUFFER_SIZE, "%d", r);
+  buff += len;
+  len = snprintf(buff,BUFFER_SIZE, "/json");
+
+  /* len < 0: Error. Len >= BUFFER_SIZE: Buffer too small */
+  if(len < 0 || len >= BUFFER_SIZE) {
+    LOG_INFO("Sub topic: %d, buffer %d\n", len, BUFFER_SIZE);
+    return 0;
+  }
+
+  return 1;
+}
+/*---------------------------------------------------------------------------*/
+static void
 mqtt_event(struct mqtt_connection *m, mqtt_event_t event, void *data)
 {
   switch(event) {
   case MQTT_EVENT_CONNECTED: {
     LOG_INFO("Application has a MQTT connection!\n");
     timer_set(&connection_life, CONNECTION_STABLE_TIME);
-    state = STATE_CONNECTED;
+
+    state = STATE_SUBSCRIBE;
     break;
   }
   case MQTT_EVENT_DISCONNECTED: {
@@ -269,26 +305,6 @@ construct_pub_topic(void)
   /* len < 0: Error. Len >= BUFFER_SIZE: Buffer too small */
   if(len < 0 || len >= BUFFER_SIZE) {
     LOG_ERR("Pub topic: %d, buffer %d\n", len, BUFFER_SIZE);
-    return 0;
-  }
-
-  return 1;
-}
-/*---------------------------------------------------------------------------*/
-static int
-construct_sub_topic(void)
-{
-  char * buff = sub_topic;
-  int len = snprintf(buff, BUFFER_SIZE, MQTT_DEMO_SUB_TOPIC);
-  buff += len;
-  len = snprintf(buff,BUFFER_SIZE, "%d", r);
-  buff += len;
-  len = snprintf(buff,BUFFER_SIZE, "/json");
-  LOG_INFO("sub topic %s",sub_topic);
-
-  /* len < 0: Error. Len >= BUFFER_SIZE: Buffer too small */
-  if(len < 0 || len >= BUFFER_SIZE) {
-    LOG_INFO("Sub topic: %d, buffer %d\n", len, BUFFER_SIZE);
     return 0;
   }
 
@@ -367,20 +383,7 @@ init_config()
   conf.broker_port = DEFAULT_BROKER_PORT;
   conf.pub_interval = DEFAULT_PUBLISH_INTERVAL;
 }
-/*---------------------------------------------------------------------------*/
-static void
-subscribe(void)
-{
-  mqtt_status_t status;
 
-  status = mqtt_subscribe(&conn, NULL, sub_topic, MQTT_QOS_LEVEL_0);
-
-  LOG_INFO("Subscribing\n");
-  if(status == MQTT_STATUS_OUT_QUEUE_FULL) {
-    LOG_INFO("Tried to subscribe but command queue was full!\n");
-  }
-}
-/*---------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
 static void
 publish(void)
@@ -468,7 +471,18 @@ state_machine(void)
     /* Not connected yet. Wait */
     LOG_INFO("Connecting: retry %u...\n", connect_attempt);
     break;
+  case STATE_SUBSCRIBE:
+    // if(mqtt_ready(&conn) && conn.out_buffer_sent) {
+    //   subscribe();
+    // }
+    state =STATE_CONNECTED;
+    break;
   case STATE_CONNECTED:
+      if(mqtt_ready(&conn) && conn.out_buffer_sent) {
+        if(state == STATE_CONNECTED && !hasSubscribed) {
+          subscribe();
+        }
+      }
     break;
   case STATE_PUBLISHING:
     /* If the timer expired, the connection is stable */
@@ -512,6 +526,7 @@ state_machine(void)
     break;
   case STATE_DISCONNECTED:
     LOG_INFO("Disconnected\n");
+    hasSubscribed=false;
     if(connect_attempt < RECONNECT_ATTEMPTS ||
        RECONNECT_ATTEMPTS == RETRY_FOREVER) {
       /* Disconnect and backoff */
@@ -535,10 +550,12 @@ state_machine(void)
     }
     break;
   case STATE_CONFIG_ERROR:
+    hasSubscribed=false;
     /* Idle away. The only way out is a new config */
     LOG_ERR("Bad configuration.\n");
     return;
   case STATE_ERROR:
+      hasSubscribed=false;
   default:
     leds_on(MQTT_DEMO_STATUS_LED);
     /*
@@ -636,7 +653,6 @@ PROCESS_THREAD(mqtt_demo_process, ev, data)
             /* Send to DAG root */
             rpl_dag_t * dag = rpl_get_any_dag();
             temp =  *rpl_parent_get_ipaddr(dag->preferred_parent);
-            LOG_INFO("%d %d \n",parent_ipaddr.u16,parent_ipaddr.u8);
             if(parent_ipaddr.u16!=temp.u16){
                 parent_ipaddr = temp;
                 LOG_INFO("My new parent is");
