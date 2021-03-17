@@ -403,8 +403,17 @@ static void connect_to_broker(void) {
 }
 
 /*---------------------------------------------------------------------------*/
-/*static void connect_to_parent() {
-  if(NETSTACK_ROUTING.node_is_reachable()) {
+static void connect_to_parent() {
+  // Attempt with uip_ds6_defrt_choose. Does not work: crashes when using >3 motes.
+  uip_ipaddr_t parent_ipaddr;
+  uip_ipaddr_copy(&parent_ipaddr, uip_ds6_defrt_choose());
+  LOG_INFO("Sending UDP to default router with ip ");
+  LOG_INFO_6ADDR(&parent_ipaddr);
+  LOG_INFO_("\n");
+  simple_udp_sendto(&udp_conn_as_son, &r, sizeof(r), &parent_ipaddr);
+
+  // Attempt with rpl_parent_get_ipaddr. Does not work: causes publish to disappear.
+  /*if(NETSTACK_ROUTING.node_is_reachable()) {
     rpl_dag_t * dag = rpl_get_any_dag();
     temp_ipaddr = *rpl_parent_get_ipaddr(dag->preferred_parent);
     if(parent_ipaddr.u16[0]!=temp_ipaddr.u16[0] || parent_ipaddr.u16[1]!=temp_ipaddr.u16[1]){
@@ -416,8 +425,8 @@ static void connect_to_broker(void) {
     }
   } else {
     LOG_INFO("Not reachable yet\n");
-  }
-}*/
+  }*/
+}
 
 /*---------------------------------------------------------------------------*/
 static void state_machine(void) {
@@ -477,7 +486,7 @@ static void state_machine(void) {
         subscribe();
         state = STATE_CHECK_PARENT;
       } else if(state == STATE_CHECK_PARENT) {
-        //connect_to_parent(); // Uncomment this to check for parent.
+        connect_to_parent(); // Uncomment this to check for parent.
         state = STATE_PUBLISHING; // Uncomment this to skip check for parent.
       } else {
         leds_on(MQTT_DEMO_STATUS_LED);
