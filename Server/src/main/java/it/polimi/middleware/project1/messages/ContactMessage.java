@@ -7,10 +7,10 @@ import java.io.Serializable;
  */
 public class ContactMessage implements Serializable {
 
-	public final int myId;
-	public final int otherId;
+	public final String myId;
+	public final String otherId;
 
-	public ContactMessage(int myId, int otherId) {
+	public ContactMessage(String myId, String otherId) {
 		this.myId = myId;
 		this.otherId = otherId;
 	}

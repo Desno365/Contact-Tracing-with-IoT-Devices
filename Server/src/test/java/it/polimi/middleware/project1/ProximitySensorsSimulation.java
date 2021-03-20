@@ -18,12 +18,14 @@ public class ProximitySensorsSimulation {
 	private static final int PERIOD_IN_SECONDS = 5;
 	private static final int STOP_AFTER_SECONDS = 7;
 
-	private static final HashMap<Integer, ProximitySensor> proximitySensorHashMap = new HashMap<>();
+	private static final HashMap<String, ProximitySensor> proximitySensorHashMap = new HashMap<>();
 
 	public static void main(String[] args) {
 		// Create proximity sensors.
-		for(int deviceId = 1; deviceId <= NUMBER_OF_SENSORS; deviceId++) {
-			final String region = getExampleRegionForDeviceId(deviceId);
+		for(int i = 1; i <= NUMBER_OF_SENSORS; i++) {
+			final int regionNumber = (i % 2) + 1;
+			final String region =  "region" + regionNumber;
+			final String deviceId = getDeviceIdFromDeviceNumber(i);
 			final ProximitySensor proximitySensor = new ProximitySensor(deviceId, region);
 			proximitySensorHashMap.put(deviceId, proximitySensor);
 		}
@@ -43,18 +45,13 @@ public class ProximitySensorsSimulation {
 		}, STOP_AFTER_SECONDS * 1000);
 	}
 
-	private static String getExampleRegionForDeviceId(int deviceId) {
-		int regionNumber = (deviceId % 3) + 1;
-		return "region" + regionNumber;
-	}
-
 	private static void createSimulatedContact() {
 		// Get a random deviceId.
-		final int deviceId = getRandomValidDeviceId();
+		final String deviceId = getRandomValidDeviceId();
 
 		// Get another deviceId, but make sure that is different from the previous one.
-		int otherDeviceId = deviceId;
-		while(otherDeviceId == deviceId)
+		String otherDeviceId = deviceId;
+		while(otherDeviceId.equals(deviceId))
 			otherDeviceId = ProximitySensorsSimulation.getRandomValidDeviceId();
 
 		// Send contact message.
@@ -62,8 +59,13 @@ public class ProximitySensorsSimulation {
 		proximitySensorHashMap.get(otherDeviceId).sendSimulatedContactMessage(deviceId);
 	}
 
-	public static int getRandomValidDeviceId() {
-		return new Random().nextInt(ProximitySensorsSimulation.NUMBER_OF_SENSORS) + 1;
+	public static String getRandomValidDeviceId() {
+		final int deviceNumber = new Random().nextInt(ProximitySensorsSimulation.NUMBER_OF_SENSORS) + 1;
+		return getDeviceIdFromDeviceNumber(deviceNumber);
+	}
+
+	public static String getDeviceIdFromDeviceNumber(int deviceNumber) {
+		return "fe80::" + deviceNumber;
 	}
 
 }

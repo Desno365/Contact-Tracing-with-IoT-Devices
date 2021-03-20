@@ -41,7 +41,7 @@ public class MqttUtils {
 	 * @param deviceId the device that should receive the notification.
 	 * @return the name of the topic for a notification to be sent to a certain device.
 	 */
-	public static String getNotificationTopicForDevice(int deviceId) {
+	public static String getNotificationTopicForDevice(String deviceId) {
 		return "AccordiBurattiMotta-Topic/notif/sensor" + deviceId + "/json";
 	}
 }

@@ -13,6 +13,7 @@ import it.polimi.middleware.project1.utils.AkkaUtils;
 import it.polimi.middleware.project1.utils.MqttUtils;
 import org.eclipse.paho.client.mqttv3.*;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
@@ -21,6 +22,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -123,10 +125,13 @@ public class ServerActor extends AbstractActor {
 
 				try {
 					final JSONObject jsonObject = new JSONObject(stringPayload);
-					final int myId = jsonObject.getJSONObject("contact").getInt("myId");
-					final int otherId = jsonObject.getJSONObject("contact").getInt("otherId");
+					final String myId = jsonObject.getJSONObject("contact").getString("myId");
+					final JSONArray otherIds = jsonObject.getJSONObject("contact").getJSONArray("otherIds");
 
-					self().tell(new ContactMessage(myId, otherId), ActorRef.noSender());
+					for(Object otherIdObject : otherIds) {
+						final String otherId = (String) otherIdObject;
+						self().tell(new ContactMessage(myId, otherId), ActorRef.noSender());
+					}
 				} catch(Exception err) {
 					log("Failed to process json, error: " + err.toString());
 				}
@@ -150,7 +155,7 @@ public class ServerActor extends AbstractActor {
 	private void onContactMessage(ContactMessage msg) {
 		log("Contact message received: myId " + msg.myId + ", otherId: " + msg.otherId + ".");
 
-		if(msg.myId == msg.otherId) {
+		if(msg.myId.equals(msg.otherId)) {
 			log("Device in contact with itself, ignored.");
 			return;
 		}
@@ -191,16 +196,16 @@ public class ServerActor extends AbstractActor {
 	private void onEventOfInterestReportMessage(EventOfInterestReportMessage msg) {
 		log("Event of interest report received: affectedId " + msg.affectedId + ".");
 
-		final Map<Integer, Long> timestampOfContactsOfSingleDevice = contacts.getTimestampOfContactsOfAffectedDevice(msg.affectedId);
+		final Map<String, Long> timestampOfContactsOfSingleDevice = contacts.getTimestampOfContactsOfAffectedDevice(msg.affectedId);
 		log("Devices entered in contact with " + msg.affectedId + " are " + timestampOfContactsOfSingleDevice.keySet().toString() + ".");
 
-		for(Map.Entry<Integer, Long> entry : timestampOfContactsOfSingleDevice.entrySet())
+		for(Map.Entry<String, Long> entry : timestampOfContactsOfSingleDevice.entrySet())
 			sendNotificationToDevice(entry.getKey(), entry.getValue());
 
 		sender().tell(new EventOfInterestAckMessage(msg.affectedId, msg.region), self());
 	}
 
-	private void sendNotificationToDevice(int deviceId, long timestampOfContact) {
+	private void sendNotificationToDevice(String deviceId, long timestampOfContact) {
 		final String messageContent = getNotificationMessageContent(deviceId, timestampOfContact);
 		final String topic = MqttUtils.getNotificationTopicForDevice(deviceId);
 		try {
@@ -214,7 +219,7 @@ public class ServerActor extends AbstractActor {
 		}
 	}
 
-	private String getNotificationMessageContent(int deviceId, long timestampOfContact) {
+	private String getNotificationMessageContent(String deviceId, long timestampOfContact) {
 		return "{\"notification\":{\"deviceId\":\"" + deviceId + "\",\"timestampOfContact\":\"" + timestampOfContact + "\"}}";
 	}
 

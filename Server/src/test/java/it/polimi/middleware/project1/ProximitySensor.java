@@ -9,12 +9,12 @@ import java.util.Date;
 
 public class ProximitySensor {
 
-	private final int deviceId;
+	private final String deviceId;
 	private final String region;
 
 	private IMqttClient mqttProducer;
 
-	public ProximitySensor(int deviceId, String region) {
+	public ProximitySensor(String deviceId, String region) {
 		this.deviceId = deviceId;
 		this.region = region;
 		String subscriberId = "sensor" + deviceId + "-sub";
@@ -45,7 +45,7 @@ public class ProximitySensor {
 
 				try {
 					final JSONObject jsonObject = new JSONObject(stringPayload);
-					final int receivedDeviceId = jsonObject.getJSONObject("notification").getInt("deviceId");
+					final String receivedDeviceId = jsonObject.getJSONObject("notification").getString("deviceId");
 					final long timestampOfContact = jsonObject.getJSONObject("notification").getLong("timestampOfContact");
 					final Date date = new Date(timestampOfContact);
 					log("Received notification of contact: device id received: " + receivedDeviceId + "; time of contact: " + date.toString() + ".");
@@ -59,8 +59,8 @@ public class ProximitySensor {
 		}
 	}
 
-	public void sendSimulatedContactMessage(int otherDeviceId) {
-		assert deviceId != otherDeviceId;
+	public void sendSimulatedContactMessage(String otherDeviceId) {
+		assert !deviceId.equals(otherDeviceId);
 
 		if(mqttProducer == null || !mqttProducer.isConnected()) {
 			log("Not connected.");
@@ -79,8 +79,8 @@ public class ProximitySensor {
 		}
 	}
 
-	private String getContactMessage(int otherDeviceId) {
-		return "{\"contact\":{\"myId\":\"" + deviceId + "\",\"otherId\":\"" + otherDeviceId + "\"}}";
+	private String getContactMessage(String otherDeviceId) {
+		return "{\"contact\":{\"myId\":\"" + deviceId + "\",\"otherIds\":[\"" + otherDeviceId + "\"]}}";
 	}
 
 	private void log(String message) {
