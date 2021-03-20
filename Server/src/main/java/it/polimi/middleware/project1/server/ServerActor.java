@@ -13,6 +13,7 @@ import it.polimi.middleware.project1.utils.AkkaUtils;
 import it.polimi.middleware.project1.utils.MqttUtils;
 import org.eclipse.paho.client.mqttv3.*;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
@@ -21,6 +22,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -124,9 +126,12 @@ public class ServerActor extends AbstractActor {
 				try {
 					final JSONObject jsonObject = new JSONObject(stringPayload);
 					final String myId = jsonObject.getJSONObject("contact").getString("myId");
-					final String otherId = jsonObject.getJSONObject("contact").getString("otherId");
+					final JSONArray otherIds = jsonObject.getJSONObject("contact").getJSONArray("otherIds");
 
-					self().tell(new ContactMessage(myId, otherId), ActorRef.noSender());
+					for(Object otherIdObject : otherIds) {
+						final String otherId = (String) otherIdObject;
+						self().tell(new ContactMessage(myId, otherId), ActorRef.noSender());
+					}
 				} catch(Exception err) {
 					log("Failed to process json, error: " + err.toString());
 				}

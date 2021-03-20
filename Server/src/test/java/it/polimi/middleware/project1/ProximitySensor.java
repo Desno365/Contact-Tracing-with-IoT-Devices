@@ -80,7 +80,7 @@ public class ProximitySensor {
 	}
 
 	private String getContactMessage(String otherDeviceId) {
-		return "{\"contact\":{\"myId\":\"" + deviceId + "\",\"otherId\":\"" + otherDeviceId + "\"}}";
+		return "{\"contact\":{\"myId\":\"" + deviceId + "\",\"otherId\":[\"" + otherDeviceId + "\"]}}";
 	}
 
 	private void log(String message) {
