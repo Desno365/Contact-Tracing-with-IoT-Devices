@@ -13,7 +13,7 @@ import java.util.Map;
  */
 public class Contacts implements Serializable {
 
-	private final HashMap<Integer, ContactsOfSingleDevice> contactsHashMap;
+	private final HashMap<String, ContactsOfSingleDevice> contactsHashMap;
 
 	/**
 	 * Constructs an empty contacts structure.
@@ -28,7 +28,7 @@ public class Contacts implements Serializable {
 	 */
 	public Contacts(String jsonString) {
 		final Gson gson = new Gson();
-		final Type type = new TypeToken<HashMap<Integer, ContactsOfSingleDevice>>(){}.getType();
+		final Type type = new TypeToken<HashMap<String, ContactsOfSingleDevice>>(){}.getType();
 		contactsHashMap = gson.fromJson(jsonString, type);
 	}
 
@@ -51,7 +51,7 @@ public class Contacts implements Serializable {
 	 */
 	public void printContacts() {
 		System.out.println("######### CURRENT CONTACTS #########");
-		for(Map.Entry<Integer, ContactsOfSingleDevice> entry : contactsHashMap.entrySet()) {
+		for(Map.Entry<String, ContactsOfSingleDevice> entry : contactsHashMap.entrySet()) {
 			ContactsOfSingleDevice contactsOfSingleDevice = entry.getValue();
 			System.out.println(contactsOfSingleDevice.toString());
 		}
@@ -63,8 +63,8 @@ public class Contacts implements Serializable {
 	 * @param deviceId1 the device that entered in contact with deviceId2.
 	 * @param deviceId2 the device that entered in contact with deviceId1.
 	 */
-	public void addContact(int deviceId1, int deviceId2) {
-		if(deviceId1 == deviceId2)
+	public void addContact(String deviceId1, String deviceId2) {
+		if(deviceId1.equals(deviceId2))
 			throw new IllegalArgumentException("Device can't be in contact with itself. Device id: " + deviceId1 + ".");
 
 		// Two directional contacts since the contact is bidirectional.
@@ -78,7 +78,7 @@ public class Contacts implements Serializable {
 	 * @param affectedDeviceId the id of the device affected.
 	 * @return a <code>Map</code> containing the devices that affectedDeviceId entered in contact with (and also the timestamp of the contact).
 	 */
-	public Map<Integer, Long> getTimestampOfContactsOfAffectedDevice(int affectedDeviceId) {
+	public Map<String, Long> getTimestampOfContactsOfAffectedDevice(String affectedDeviceId) {
 		ContactsOfSingleDevice contactsOfSingleDevice = contactsHashMap.get(affectedDeviceId);
 		if(contactsOfSingleDevice != null)
 			return contactsOfSingleDevice.getCopyOfTimestampOfContacts();
@@ -92,7 +92,7 @@ public class Contacts implements Serializable {
 	//region Private methods
 	// ###############################
 
-	private void addDirectionalContact(int deviceId, int otherDeviceId, long timestamp) {
+	private void addDirectionalContact(String deviceId, String otherDeviceId, long timestamp) {
 		// Get container of contacts of "deviceId" (if it is absent it is created).
 		ContactsOfSingleDevice contactsOfDevice = contactsHashMap.computeIfAbsent(deviceId, ContactsOfSingleDevice::new);
 

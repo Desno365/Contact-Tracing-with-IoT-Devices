@@ -29,18 +29,12 @@ public class Main {
 		while(isNotExitCommand(region)) {
 			region = insertRegion();
 			if(isNotExitCommand(region)) {
-				int affectedId = insertDeviceId();
-				if(affectedId >= 0) {
+				final String affectedId = insertDeviceId();
+				if(affectedId.equals("-1"))
+					eventOfInterestReporterActorRef.tell(new RequestSimulatedCrashMessage(region), ActorRef.noSender());
+				else
 					eventOfInterestReporterActorRef.tell(new EventOfInterestReportMessage(affectedId, region, eventOfInterestReporterActorRef), ActorRef.noSender());
-					Thread.sleep(2000);
-				} else {
-					if(affectedId == -1) {
-						eventOfInterestReporterActorRef.tell(new RequestSimulatedCrashMessage(region), ActorRef.noSender());
-						Thread.sleep(2000);
-					} else {
-						System.out.println("Device id should be a positive number!");
-					}
-				}
+				Thread.sleep(2000);
 			}
 		}
 
@@ -61,16 +55,12 @@ public class Main {
 		return scanner.next().toLowerCase();
 	}
 
-	private static int insertDeviceId() {
+	private static String insertDeviceId() {
 		Scanner scanner = new Scanner(System.in);
 		System.out.println("##############################################");
 		System.out.println("Enter device id affected by event of interest (-1 to simulate crash):");
 		System.out.println("##############################################");
-		try {
-			return scanner.nextInt();
-		} catch(Exception e) {
-			return -1;
-		}
+		return scanner.next();
 	}
 
 }

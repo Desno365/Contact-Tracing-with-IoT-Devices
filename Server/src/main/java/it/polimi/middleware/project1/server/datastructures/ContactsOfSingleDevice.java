@@ -6,16 +6,16 @@ import java.util.Map;
 
 public class ContactsOfSingleDevice implements Serializable {
 
-	private final int deviceId;
-	private final Map<Integer, Long> timestampOfContacts = new HashMap<>();
+	private final String deviceId;
+	private final Map<String, Long> timestampOfContacts = new HashMap<>();
 
-	public ContactsOfSingleDevice(int deviceId) {
+	public ContactsOfSingleDevice(String deviceId) {
 		this.deviceId = deviceId;
 	}
 
 	@Override
 	public String toString() {
-		return "Contacts of device " + deviceId + ": " + timestampOfContacts.toString() + ".";
+		return "Contacts of device \"" + deviceId + "\": " + timestampOfContacts.toString() + ".";
 	}
 
 	/**
@@ -23,8 +23,8 @@ public class ContactsOfSingleDevice implements Serializable {
 	 * @param otherDeviceId the device that entered in contact with this single device.
 	 * @param timestampOfContact the timestamp of the contact.
 	 */
-	public void addOrUpdateContact(final int otherDeviceId, final long timestampOfContact) {
-		if(deviceId == otherDeviceId)
+	public void addOrUpdateContact(final String otherDeviceId, final long timestampOfContact) {
+		if(deviceId.equals(otherDeviceId))
 			throw new IllegalArgumentException("Device can't be in contact with itself. Device id: " + deviceId + ".");
 		timestampOfContacts.put(otherDeviceId, timestampOfContact);
 	}
@@ -33,7 +33,7 @@ public class ContactsOfSingleDevice implements Serializable {
 	 * Returns a copy of the contacts of this single device.
 	 * @return a <code>Map</code> containing the devices that affectedDeviceId entered in contact with (and also the timestamp of the contact).
 	 */
-	public Map<Integer, Long> getCopyOfTimestampOfContacts() {
+	public Map<String, Long> getCopyOfTimestampOfContacts() {
 		return new HashMap<>(timestampOfContacts);
 	}
 }

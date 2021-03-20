@@ -8,10 +8,10 @@ import java.io.Serializable;
  */
 public class EventOfInterestAckMessage implements Serializable {
 
-	public final int affectedId;
+	public final String affectedId;
 	public final String region;
 
-	public EventOfInterestAckMessage(int affectedId, String region) {
+	public EventOfInterestAckMessage(String affectedId, String region) {
 		this.affectedId = affectedId;
 		this.region = region;
 	}
