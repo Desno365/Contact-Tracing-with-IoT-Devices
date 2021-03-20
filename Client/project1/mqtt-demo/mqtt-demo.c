@@ -56,12 +56,10 @@ static uint8_t previous_connect_attempt;
 /*---------------------------------------------------------------------------*/
 /* Various states */
 static uint8_t state;
-static uint8_t previous_state;
 #define STATE_INIT            0
 #define STATE_REGISTERED      1
 #define STATE_CONNECTING      2
 #define STATE_CONNECTED       3
-#define STATE_CHECK_PARENT    7
 #define STATE_PUBLISHING      4
 #define STATE_DISCONNECTED    5
 #define STATE_NEWCONFIG       6
@@ -96,10 +94,6 @@ static uint8_t previous_state;
 #define UDP_SERVER_PORT	5678
 #define START_INTERVAL		(15 * CLOCK_SECOND)
 #define SEND_INTERVAL		  (60 * CLOCK_SECOND)
-static struct simple_udp_connection udp_conn_as_parent;
-static struct simple_udp_connection udp_conn_as_son;
-//static uip_ipaddr_t parent_ipaddr;
-//static uip_ipaddr_t temp_ipaddr;
 
 /*---------------------------------------------------------------------------*/
 PROCESS_NAME(mqtt_demo_process);
@@ -150,8 +144,6 @@ static struct etimer publish_periodic_timer;
 static struct ctimer ct;
 static char *buf_ptr;
 static uint16_t seq_nr_value = 0;
-static int r = -1;
-static unsigned otherId;
 
 /*---------------------------------------------------------------------------*/
 static mqtt_client_config_t conf;
@@ -191,6 +183,7 @@ static void publish_led_off(void *d) {
 /*---------------------------------------------------------------------------*/
 static void pub_handler(const char *topic, uint16_t topic_len, const uint8_t *chunk, uint16_t chunk_len) {
   LOG_INFO("Pub handler: topic='%s' (len=%u), chunk_len=%u\n", topic, topic_len, chunk_len);
+  LOG_INFO("Received message: '%s'\n", chunk);
 
   /* If the format != json, ignore */
   if(strncmp(&topic[topic_len - 4], "json", 4) != 0) {
@@ -262,7 +255,15 @@ static int construct_sub_topic(void) {
   char * buff = sub_topic;
   int len = snprintf(buff, BUFFER_SIZE, MQTT_DEMO_SUB_TOPIC);
   buff += len;
-  len = snprintf(buff,BUFFER_SIZE, "%d", r);
+
+  uip_ds6_addr_t *myaddr;
+  myaddr = uip_ds6_get_link_local(-1);
+  char myaddr_char[64];
+  memset(myaddr_char, 0, sizeof(myaddr_char));
+  ipaddr_sprintf(myaddr_char, sizeof(myaddr_char), &myaddr->ipaddr);
+
+  len = snprintf(buff,BUFFER_SIZE, "%s", myaddr_char);
+
   buff += len;
   len = snprintf(buff,BUFFER_SIZE, "/json");
 
@@ -351,7 +352,7 @@ static void subscribe(void) {
 
   status = mqtt_subscribe(&conn, NULL, sub_topic, MQTT_QOS_LEVEL_0);
 
-  LOG_INFO("Subscribing\n");
+  LOG_INFO("Subscribing to topic %s\n",sub_topic);
   if(status == MQTT_STATUS_OUT_QUEUE_FULL) {
     LOG_INFO("Tried to subscribe but command queue was full!\n");
   }
@@ -360,28 +361,59 @@ static void subscribe(void) {
 /*---------------------------------------------------------------------------*/
 static void publish(void)
 {
-  /* Publish MQTT topic */
+  uip_ds6_addr_t *myaddr;
+  myaddr = uip_ds6_get_link_local(-1);
+  char myaddr_char[64];
+  memset(myaddr_char, 0, sizeof(myaddr_char));
+  ipaddr_sprintf(myaddr_char, sizeof(myaddr_char), &myaddr->ipaddr);
+  uip_ds6_nbr_t *nbr;
+  nbr = nbr_table_head(ds6_neighbors);
+
   int len;
   int remaining = APP_BUFFER_SIZE;
 
   seq_nr_value++;
 
   buf_ptr = app_buffer;
+  len = snprintf(buf_ptr, remaining,
+              "{"
+              "\"contact\":{"
+              "\"myId\":\"%s\","
+              "\"otherIds\":[",
+              myaddr_char); 
+  remaining -= len;
+  buf_ptr += len;
+
+  while(nbr != NULL) {
+    // LOG_INFO_6ADDR(&nbr->ipaddr);
+    char otheraddr_char[64];
+    memset(otheraddr_char, 0, sizeof(otheraddr_char));
+    ipaddr_sprintf(otheraddr_char, sizeof(otheraddr_char), &nbr->ipaddr);
+
+    len = snprintf(buf_ptr, remaining,
+              "\"%s\"",
+              otheraddr_char); 
+    remaining -= len;
+    buf_ptr += len;
+
+    nbr = nbr_table_next(ds6_neighbors, nbr);
+    if(nbr != NULL){
+      len = snprintf(buf_ptr, remaining,
+          ","); 
+      remaining -= len;
+      buf_ptr += len;
+    }
+  }
 
   len = snprintf(buf_ptr, remaining,
-                 "{"
-                 "\"contact\":{"
-                 "\"myId\":%d,"
-                 "\"otherId\":%d",
-                 r, otherId); 
+            "]"); 
+  remaining -= len;
+  buf_ptr += len;
 
   if(len < 0 || len >= remaining) {
     LOG_ERR("Buffer too short. Have %d, need %d + \\0\n", remaining, len);
     return;
   }
-
-  remaining -= len;
-  buf_ptr += len;
 
   len = snprintf(buf_ptr, remaining, "}}");
 
@@ -403,37 +435,7 @@ static void connect_to_broker(void) {
 }
 
 /*---------------------------------------------------------------------------*/
-static void connect_to_parent() {
-  // Attempt with uip_ds6_defrt_choose. Does not work: crashes when using >3 motes.
-  uip_ipaddr_t parent_ipaddr;
-  uip_ipaddr_copy(&parent_ipaddr, uip_ds6_defrt_choose());
-  LOG_INFO("Sending UDP to default router with ip ");
-  LOG_INFO_6ADDR(&parent_ipaddr);
-  LOG_INFO_("\n");
-  simple_udp_sendto(&udp_conn_as_son, &r, sizeof(r), &parent_ipaddr);
-
-  // Attempt with rpl_parent_get_ipaddr. Does not work: causes publish to disappear.
-  /*if(NETSTACK_ROUTING.node_is_reachable()) {
-    rpl_dag_t * dag = rpl_get_any_dag();
-    temp_ipaddr = *rpl_parent_get_ipaddr(dag->preferred_parent);
-    if(parent_ipaddr.u16[0]!=temp_ipaddr.u16[0] || parent_ipaddr.u16[1]!=temp_ipaddr.u16[1]){
-        parent_ipaddr = temp_ipaddr;
-        LOG_INFO("My new parent is ");
-        LOG_INFO_6ADDR(&parent_ipaddr);
-        LOG_INFO_("\n");
-        simple_udp_sendto(&udp_conn_as_son, &r, sizeof(r), &parent_ipaddr);
-    }
-  } else {
-    LOG_INFO("Not reachable yet\n");
-  }*/
-}
-
-/*---------------------------------------------------------------------------*/
 static void state_machine(void) {
-  if(state != previous_state) {
-    LOG_INFO("Change of state! Previous %d, current %d.\n", previous_state, state);
-    previous_state = state;
-  }
   switch(state) {
   case STATE_INIT:
     /* If we have just been configured register MQTT connection */
@@ -470,7 +472,6 @@ static void state_machine(void) {
     }
     break;
   case STATE_CONNECTED:
-  case STATE_CHECK_PARENT:
   case STATE_PUBLISHING:
     /* If the timer expired, the connection is stable */
     if(timer_expired(&connection_life)) {
@@ -484,15 +485,11 @@ static void state_machine(void) {
     if(mqtt_ready(&conn) && conn.out_buffer_sent) {
       if(state == STATE_CONNECTED) {
         subscribe();
-        state = STATE_CHECK_PARENT;
-      } else if(state == STATE_CHECK_PARENT) {
-        connect_to_parent(); // Uncomment this to check for parent.
-        state = STATE_PUBLISHING; // Uncomment this to skip check for parent.
+        state = STATE_PUBLISHING;
       } else {
         leds_on(MQTT_DEMO_STATUS_LED);
         ctimer_set(&ct, PUBLISH_LED_ON_DURATION, publish_led_off, NULL);
         publish();
-        //state = STATE_CHECK_PARENT; // TODO see if this should be done.
       }
       etimer_set(&publish_periodic_timer, conf.pub_interval);
 
@@ -552,66 +549,12 @@ static void state_machine(void) {
   /* If we didn't return so far, reschedule ourselves */
   etimer_set(&publish_periodic_timer, STATE_MACHINE_PERIODIC);
 }
-
-/*---------------------------------------------------------------------------*/
-static void force_publish() {
-  if(state==STATE_CHECK_PARENT || state==STATE_PUBLISHING) {
-    LOG_INFO("Forced publishing.\n");
-    state=STATE_PUBLISHING;
-    state_machine();
-  } else {
-    LOG_INFO("Received ID from UDP but not in correct state.\n");
-  }
-}
-
-/*---------------------------------------------------------------------------*/
-static void udp_rx_callback_parent(struct simple_udp_connection *c, const uip_ipaddr_t *sender_addr, uint16_t sender_port, const uip_ipaddr_t *receiver_addr, uint16_t receiver_port, const uint8_t *data, uint16_t datalen) {
-  unsigned received_other_id = *(unsigned *)data;
-  LOG_INFO("Parent received id %u from son with ip ", received_other_id);
-  LOG_INFO_6ADDR(sender_addr);
-  LOG_INFO_("\n");
-  otherId = received_other_id;
-  LOG_INFO("Sending my ID %u to ", r);
-  LOG_INFO_6ADDR(sender_addr);
-  LOG_INFO_("\n");
-  simple_udp_sendto(&udp_conn_as_parent, &r, sizeof(r), sender_addr);
-
-  force_publish();
-}
-
-/*---------------------------------------------------------------------------*/
-static void udp_rx_callback_son(struct simple_udp_connection *c, const uip_ipaddr_t *sender_addr, uint16_t sender_port, const uip_ipaddr_t *receiver_addr, uint16_t receiver_port, const uint8_t *data, uint16_t datalen) {
-  unsigned received_other_id = *(unsigned *)data;
-  LOG_INFO("Son received id %u from parent with ip ", received_other_id);
-  LOG_INFO_6ADDR(sender_addr);
-  LOG_INFO_("\n");
-  otherId=received_other_id;
-
-  force_publish();
-}
-
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(mqtt_demo_process, ev, data) {
   PROCESS_BEGIN();
 
-  // To use random id.
-  //srand(time(NULL) + node_id); 
-  //if(r==-1) r=rand();
-
-  //To use fixed id.
-  if(r==-1) r=node_id;
-
-  LOG_INFO("My ID is: %d.\n", r);
-
   init_config(); // Sets configuration of MQTT.
   update_config(); // Constructs client id, sub topic, pub topic; Set state to STATE_INIT; Starts publish_periodic_timer.
-
-  /* Initialize DAG root */
-  //NETSTACK_ROUTING.root_start(); // Causes instant crash.
-  /* Initialize UDP connection with parent */
-  simple_udp_register(&udp_conn_as_son, UDP_CLIENT_PORT, NULL, UDP_SERVER_PORT, udp_rx_callback_son);
-  /* Initialize UDP connection with sons */
-  simple_udp_register(&udp_conn_as_parent, UDP_SERVER_PORT, NULL, UDP_CLIENT_PORT, udp_rx_callback_parent);
 
   /* Main loop */
   while(1) {
