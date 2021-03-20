@@ -23,7 +23,7 @@ public class ProximitySensorsSimulation {
 	public static void main(String[] args) {
 		// Create proximity sensors.
 		for(int i = 1; i <= NUMBER_OF_SENSORS; i++) {
-			final int regionNumber = (i % 3) + 1;
+			final int regionNumber = (i % 2) + 1;
 			final String region =  "region" + regionNumber;
 			final String deviceId = getDeviceIdFromDeviceNumber(i);
 			final ProximitySensor proximitySensor = new ProximitySensor(deviceId, region);
