@@ -28,7 +28,7 @@ Whenever one device signals an event of interest, every other device that was in
 
 ## Usage
 
-For the IoT devices see [Client/INSTRUCTIONS.md](https://github.com/Desno365/Contact-Tracing-with-IoT-Devices/blob/master/Client/INSTRUCTIONS.md).
+For the IoT devices see [Client/project1/INSTRUCTIONS.md](https://github.com/Desno365/Contact-Tracing-with-IoT-Devices/blob/master/Client/project1/INSTRUCTIONS.md).
 
 For the Server see [Server/INSTRUCTIONS-SINGLE-HOST.md](https://github.com/Desno365/Contact-Tracing-with-IoT-Devices/blob/master/Server/INSTRUCTIONS-SINGLE-HOST.md) or [Server/INSTRUCTIONS-MULTIPLE-HOSTS.md](https://github.com/Desno365/Contact-Tracing-with-IoT-Devices/blob/master/Server/INSTRUCTIONS-MULTIPLE-HOSTS.md).
 
