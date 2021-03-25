@@ -21,7 +21,9 @@ In each host the file /src/main/resources/akka.conf needs to be configured based
 * `akka.remote.artery.canonical.hostname=<host-ip>`
 * `akka.cluster.seed-nodes=["akka://contact-tracing-system@<seed-node-ip>:6123"]`
 
-Substitute <host-ip> with the IPv4 address of the host running the configuration, <seed-node-ip> with the IPv4 address of the host running the seed node.
+Note:
+* `<host-ip>` must be substituted with the IPv4 address of the host running the configuration.
+* `<seed-node-ip>` must be substituted the IPv4 address of the host running the seed node.
 
 
 ### Step 2: Run the configurations
