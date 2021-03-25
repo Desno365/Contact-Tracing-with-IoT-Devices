@@ -32,7 +32,7 @@
                             <excludes>META-INF/*.SF</excludes>
                             <excludes>META-INF/*.DSA</excludes>
                             <excludes>META-INF/*.RSA</excludes>
-                            <excludeGroupIds>junit,org.mockito,org.hamcrest</excludeGroupIds>
+                            <excludeGroupIds>org.eclipse.paho,log4j,ch.qos.logback,com.typesafe.akka,org.junit.jupiter,com.google.code.gson,org.json,com.google.protobuf</excludeGroupIds>
                             <outputDirectory>${project.build.directory}/classes</outputDirectory>
                         </configuration>
                     </execution>
