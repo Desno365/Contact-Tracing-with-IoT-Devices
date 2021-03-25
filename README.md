@@ -3,6 +3,8 @@
 
 ## Assignment
 
+Note: for more details on the assignment see [Projects 2021.pdf](https://github.com/Desno365/Contact-Tracing-with-IoT-Devices/blob/master/Projects%202021.pdf)
+
 #### Description of the project
 
 People roaming in a given location carry IoT devices. The devices use the radio as a proximity sensor.
