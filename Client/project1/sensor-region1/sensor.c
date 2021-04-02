@@ -384,8 +384,15 @@ static void publish(void)
   remaining -= len;
   buf_ptr += len;
 
+  uip_ds6_route_t *route;
+
   while(nbr != NULL) {
     // LOG_INFO_6ADDR(&nbr->ipaddr);
+    if(uip_ds6_route_is_nexthop(&nbr->ipaddr) != 0)
+      LOG_INFO("Is Next hop");
+    else
+      LOG_INFO("Is not next");
+
     char otheraddr_char[64];
     memset(otheraddr_char, 0, sizeof(otheraddr_char));
     ipaddr_sprintf(otheraddr_char, sizeof(otheraddr_char), &nbr->ipaddr);
