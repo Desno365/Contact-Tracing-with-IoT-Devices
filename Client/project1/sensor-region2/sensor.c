@@ -56,7 +56,6 @@ static uint8_t previous_connect_attempt;
 /*---------------------------------------------------------------------------*/
 /* Various states */
 static uint8_t state;
-static uint8_t previous_state;
 #define STATE_INIT            0
 #define STATE_REGISTERED      1
 #define STATE_CONNECTING      2
@@ -353,7 +352,7 @@ static void subscribe(void) {
 
   status = mqtt_subscribe(&conn, NULL, sub_topic, MQTT_QOS_LEVEL_0);
 
-  LOG_INFO("Subscribing\n");
+  LOG_INFO("Subscribing to topic %s\n",sub_topic);
   if(status == MQTT_STATUS_OUT_QUEUE_FULL) {
     LOG_INFO("Tried to subscribe but command queue was full!\n");
   }
@@ -367,8 +366,6 @@ static void publish(void)
   char myaddr_char[64];
   memset(myaddr_char, 0, sizeof(myaddr_char));
   ipaddr_sprintf(myaddr_char, sizeof(myaddr_char), &myaddr->ipaddr);
-  // uip_ipaddr_t root_ipaddr; 
-  // rpl_dag_get_root_ipaddr(&root_ipaddr);
   uip_ds6_nbr_t *nbr;
   nbr = nbr_table_head(ds6_neighbors);
 
@@ -389,6 +386,11 @@ static void publish(void)
 
   while(nbr != NULL) {
     // LOG_INFO_6ADDR(&nbr->ipaddr);
+    if(uip_ds6_route_is_nexthop(&nbr->ipaddr) != 0)
+      LOG_INFO("Is Next hop");
+    else
+      LOG_INFO("Is not next");
+
     char otheraddr_char[64];
     memset(otheraddr_char, 0, sizeof(otheraddr_char));
     ipaddr_sprintf(otheraddr_char, sizeof(otheraddr_char), &nbr->ipaddr);
@@ -439,10 +441,6 @@ static void connect_to_broker(void) {
 
 /*---------------------------------------------------------------------------*/
 static void state_machine(void) {
-  if(state != previous_state) {
-    LOG_INFO("Change of state! Previous %d, current %d.\n", previous_state, state);
-    previous_state = state;
-  }
   switch(state) {
   case STATE_INIT:
     /* If we have just been configured register MQTT connection */

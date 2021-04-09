@@ -384,8 +384,6 @@ static void publish(void)
   remaining -= len;
   buf_ptr += len;
 
-  uip_ds6_route_t *route;
-
   while(nbr != NULL) {
     // LOG_INFO_6ADDR(&nbr->ipaddr);
     if(uip_ds6_route_is_nexthop(&nbr->ipaddr) != 0)
