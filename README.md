@@ -33,6 +33,12 @@ For the IoT devices see [Client/project1/INSTRUCTIONS.md](https://github.com/Des
 For the Server see [Server/INSTRUCTIONS-SINGLE-HOST.md](https://github.com/Desno365/Contact-Tracing-with-IoT-Devices/blob/master/Server/INSTRUCTIONS-SINGLE-HOST.md) or [Server/INSTRUCTIONS-MULTIPLE-HOSTS.md](https://github.com/Desno365/Contact-Tracing-with-IoT-Devices/blob/master/Server/INSTRUCTIONS-MULTIPLE-HOSTS.md).
 
 
+## Grade
+
+This project was made for the course: "Middleware Technologies for Distributed Systems" at "Politecnico di Milano", Academic Year 2020/2021.<br>
+Grade: 26/30.
+
+
 ## Developers
 
 [Accordi Gianmarco](https://github.com/gianfi12)
